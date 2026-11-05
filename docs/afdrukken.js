@@ -157,6 +157,6 @@ fetch(apiUrl('actie=lijst'), {cache: 'no-store'}).then(r => r.json()).then(d => 
   teken();
 }).catch(() => $('bladen').replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden.')));
 $('periode').onchange = teken;
-$('weergave').onchange = () => { $('richting').value = $('weergave').value === 'klassiek' ? 'liggend' : 'staand'; teken(); };
+$('weergave').onchange = teken;
 $('richting').onchange = teken;
 $('excel').onclick = downloadExcel;
