@@ -65,10 +65,9 @@ function tekenKlassiek() {
     })));
   }
   tbody.append(el('tr', {class: 'telling'}, el('th', {title: 'Aantal repetities'}, '#'), maanden.map(m => el('td', {}, String(aantalRepetities(items, m))))));
-  const blad = el('section', {class: 'blad liggend'}, el('h1', {}, titel), el('p', {class: 'sub'}, sub + ' · onderste regel: aantal repetities per maand'),
+  const blad = el('section', {class: 'blad klassiek-blad'}, el('h1', {}, titel), el('p', {class: 'sub'}, sub + ' · onderste regel: aantal repetities per maand'),
     el('table', {class: 'klassiek'}, el('thead', {}, kop), tbody), legenda(), vasteRepetitie(items) ? el('p', {class: 'vast'}, vasteRepetitie(items)) : null);
   $('bladen').replaceChildren(blad);
-  document.body.classList.add('liggend');
 }
 
 const ARGB = {'Repetitie':'FFCFE0F3','Extra repetitie':'FF8FD3CF','Optreden':'FFF4A6A0','Onder voorbehoud':'FFFFE45C','Vergadering':'FFC9B8E0','Vakantie':'FFB7DD9A','Overig':'FFF8CBAD'};
@@ -119,8 +118,12 @@ async function downloadExcel() {
 }
 
 function teken() {
+  const liggend = $('richting').value === 'liggend';
+  document.body.classList.toggle('liggend', liggend);
+  let ps = document.getElementById('paginastijl');
+  if (!ps) { ps = el('style', {id: 'paginastijl'}); document.head.append(ps); }
+  ps.textContent = '@page { size: A4 ' + (liggend ? 'landscape' : 'portrait') + '; margin: 0; }';
   if ($('weergave').value === 'klassiek') return tekenKlassiek();
-  document.body.classList.remove('liggend');
   const {p, items, sub, titel} = gekozen();
 
   const raster = el('div', {class: 'raster'});
@@ -154,5 +157,6 @@ fetch(apiUrl('actie=lijst'), {cache: 'no-store'}).then(r => r.json()).then(d => 
   teken();
 }).catch(() => $('bladen').replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden.')));
 $('periode').onchange = teken;
-$('weergave').onchange = teken;
+$('weergave').onchange = () => { $('richting').value = $('weergave').value === 'klassiek' ? 'liggend' : 'staand'; teken(); };
+$('richting').onchange = teken;
 $('excel').onclick = downloadExcel;
