@@ -1,0 +1,104 @@
+:root{
+  --bg:#f6f5f2; --kaart:#ffffff; --tekst:#1d1d1f; --zacht:#6b6b70; --lijn:#e3e1dc; --accent:#1f4e78; --accent-tekst:#fff;
+  --repetitie:#cfe0f3; --extra:#8fd3cf; --optreden:#f4a6a0; --voorbehoud:#ffe45c; --vergadering:#c9b8e0; --vakantie:#b7dd9a; --overig:#f8cbad;
+  --vandaag:#1f4e78; --schaduw:0 1px 3px rgba(0,0,0,.08);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141416; --kaart:#1f1f23; --tekst:#ececf0; --zacht:#a0a0a8; --lijn:#34343a; --accent:#7fb0e0; --accent-tekst:#0d1b29;
+  --repetitie:#2b4563; --extra:#1d5e5a; --optreden:#7a3530; --voorbehoud:#7a6a12; --vergadering:#4b3d66; --vakantie:#3d5e2a; --overig:#7a4a2c;
+  --vandaag:#9cc6ef; --schaduw:none; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#141416; --kaart:#1f1f23; --tekst:#ececf0; --zacht:#a0a0a8; --lijn:#34343a; --accent:#7fb0e0; --accent-tekst:#0d1b29;
+  --repetitie:#2b4563; --extra:#1d5e5a; --optreden:#7a3530; --voorbehoud:#7a6a12; --vergadering:#4b3d66; --vakantie:#3d5e2a; --overig:#7a4a2c;
+  --vandaag:#9cc6ef; --schaduw:none; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--tekst);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:16px}
+header.kop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 14px}
+header.kop h1{font-size:1.35rem;margin:0;flex:1 1 auto;line-height:1.2}
+select,input,textarea,button{font:inherit;color:inherit}
+select,input,textarea{background:var(--kaart);border:1px solid var(--lijn);border-radius:8px;padding:8px 10px;min-height:42px;width:100%}
+button{cursor:pointer;border-radius:8px;border:1px solid var(--lijn);background:var(--kaart);padding:8px 14px;min-height:42px}
+button.hoofd{background:var(--accent);color:var(--accent-tekst);border-color:var(--accent);font-weight:600}
+button.gevaar{color:#b3261e;border-color:#e8b4b0}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tabs{display:flex;gap:4px;background:var(--kaart);border:1px solid var(--lijn);border-radius:10px;padding:4px;margin-bottom:16px;position:sticky;top:8px;z-index:5;box-shadow:var(--schaduw)}
+.tabs button{flex:1;border:0;background:transparent;min-height:40px;font-weight:600;color:var(--zacht)}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-tekst)}
+.kaart{background:var(--kaart);border:1px solid var(--lijn);border-radius:12px;box-shadow:var(--schaduw)}
+.item{display:flex;gap:12px;padding:12px;align-items:flex-start}
+.item+.item{border-top:1px solid var(--lijn)}
+.dag{flex:0 0 58px;text-align:center;border-radius:10px;padding:6px 0;background:var(--bg);line-height:1.1}
+.dag b{display:block;font-size:1.45rem}
+.dag span{font-size:.78rem;color:var(--zacht);text-transform:uppercase;letter-spacing:.03em}
+.item .info{flex:1;min-width:0}
+.item .titel{font-weight:600;overflow-wrap:anywhere}
+.item .meta{color:var(--zacht);font-size:.92rem;overflow-wrap:anywhere}
+.chip{display:inline-block;font-size:.78rem;padding:2px 8px;border-radius:999px;margin-top:4px;color:var(--tekst)}
+.s-Repetitie{background:var(--repetitie)} .s-Optreden{background:var(--optreden)} .s-Onder-voorbehoud{background:var(--voorbehoud)}
+.s-Extra-repetitie{background:var(--extra)} .s-Vergadering{background:var(--vergadering)} .s-Vakantie{background:var(--vakantie)} .s-Overig{background:var(--overig)}
+.voorbij{opacity:.55}
+h2.maand{font-size:1rem;margin:18px 4px 8px;color:var(--zacht);text-transform:capitalize}
+.filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.filters button{min-height:34px;padding:4px 12px;border-radius:999px;font-size:.9rem}
+.filters button[aria-pressed="false"]{opacity:.45}
+.jaar{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.mini{padding:8px 6px}
+.mini h3{margin:0 0 6px;font-size:.95rem;text-align:center;text-transform:capitalize}
+.mini table{width:100%;border-collapse:separate;border-spacing:2px;table-layout:fixed}
+.mini th{font-size:.7rem;color:var(--zacht);font-weight:500}
+.mini td{text-align:center;font-size:.8rem;padding:0;height:26px}
+.mini td button{width:100%;height:100%;min-height:0;padding:0;border:0;border-radius:5px;background:transparent;font-size:.8rem}
+.mini td button.s-Repetitie{background:var(--repetitie)} .mini td button.s-Optreden{background:var(--optreden)} .mini td button.s-Onder-voorbehoud{background:var(--voorbehoud)}
+.mini td button.s-Extra-repetitie{background:var(--extra)} .mini td button.s-Vergadering{background:var(--vergadering)} .mini td button.s-Vakantie{background:var(--vakantie)} .mini td button.s-Overig{background:var(--overig)}
+.mini td button.heeft{font-weight:700}
+.mini td button.vandaag{outline:2px solid var(--vandaag);outline-offset:-2px}
+.mini td button[aria-pressed="true"]{outline:3px solid var(--tekst);outline-offset:-3px}
+.legenda{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.88rem;color:var(--zacht);margin:14px 2px}
+.legenda i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:5px}
+#dagdetail{position:fixed;left:8px;right:8px;bottom:8px;max-width:620px;margin:0 auto;z-index:20;max-height:50vh;overflow:auto;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+#dagdetail .sluit{position:sticky;top:0;float:right;margin:6px;min-height:34px;padding:2px 12px}
+.ruimte{height:45vh}
+.leeg{padding:16px;color:var(--zacht)}
+footer{margin:26px 2px 30px;font-size:.9rem;color:var(--zacht);display:flex;flex-wrap:wrap;gap:8px 18px}
+footer a{color:var(--accent)}
+.melding{padding:10px 12px;border-radius:8px;margin:10px 0;background:var(--voorbehoud)}
+.melding.goed{background:var(--vakantie)}
+.verborgen{display:none!important}
+dialog{border:1px solid var(--lijn);border-radius:14px;background:var(--kaart);color:var(--tekst);padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form{padding:16px}
+dialog h2{margin:0 0 12px;font-size:1.2rem}
+.veld{margin-bottom:10px}
+.veld label{display:block;font-size:.88rem;font-weight:600;margin-bottom:3px}
+.veld small{color:var(--zacht)}
+.rij{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.knoppen{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
+.balk{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.balk>*{flex:0 0 auto;width:auto}
+.item .acties{display:flex;gap:6px;flex:0 0 auto}
+.item .acties button{min-height:36px;padding:4px 10px}
+@media (max-width:520px){.rij{grid-template-columns:1fr}.item .acties{flex-direction:column}}
+@media print{.tabs,footer,.balk,.filters{display:none}body{background:#fff}}
+@media (min-width:700px){.jaar{grid-template-columns:repeat(4,1fr)}}
+.mini.deze-maand{border:2px solid var(--vandaag)}
+.knoplink{display:inline-flex;align-items:center;min-height:42px;padding:8px 14px;border:1px solid var(--lijn);border-radius:8px;background:var(--kaart);color:var(--accent);text-decoration:none}
+.maandkop{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.maandkop h2{flex:1;text-align:center;margin:0;font-size:1.2rem;text-transform:capitalize}
+.maandkop button{width:48px;font-size:1.4rem;line-height:1;padding:0}
+.naarnu{display:block;margin:-4px auto 10px;min-height:34px;padding:4px 12px;font-size:.9rem}
+.groot{width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed}
+.groot th{font-size:.75rem;color:var(--zacht);font-weight:500}
+.groot td{vertical-align:top;padding:0;height:1px}
+.groot td button{width:100%;height:100%;min-height:66px;padding:3px;border-radius:8px;border:1px solid var(--lijn);background:var(--kaart);display:flex;flex-direction:column;align-items:stretch;gap:2px;text-align:left;overflow:hidden}
+.groot td button.s-Vakantie{background:var(--vakantie)}
+.groot td button.vandaag{outline:2px solid var(--vandaag);outline-offset:-2px}
+.groot td button[aria-pressed="true"]{outline:3px solid var(--tekst);outline-offset:-3px}
+.groot td button.voorbij .nr{color:var(--zacht)}
+.groot .nr{font-size:.8rem;font-weight:600}
+.groot .chipje{display:block;font-size:.62rem;line-height:1.25;border-radius:4px;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tekst)}
+@media (min-width:700px){.groot td button{min-height:90px}.groot .chipje{font-size:.75rem}.groot .nr{font-size:.9rem}}

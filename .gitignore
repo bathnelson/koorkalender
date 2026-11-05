@@ -1,0 +1,4 @@
+# De planning, sleutels en reservekopieën staan alleen op de host, niet in git
+backend/data/*.json
+backend/data/backup/
+backend/data/.lock

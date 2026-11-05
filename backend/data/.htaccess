@@ -1,0 +1,3 @@
+# De gegevens alleen via api.php laten lezen
+Require all denied
+Deny from all

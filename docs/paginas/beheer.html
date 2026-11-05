@@ -1,0 +1,87 @@
+<div class="wrap">
+  <header class="kop">
+    <h1>Beheer jaarplanning</h1>
+    <a href="./" style="color:var(--accent)">Bekijk als lid</a> <a href="afdrukken.html" style="color:var(--accent);margin-left:12px">Afdrukversie</a>
+  </header>
+
+  <section id="login" class="kaart verborgen" style="padding:16px;max-width:420px">
+    <form id="loginform">
+      <div class="veld"><label for="ww">Wachtwoord secretaris</label><input id="ww" type="password" autocomplete="current-password" required></div>
+      <button class="hoofd" type="submit">Inloggen</button>
+      <p id="loginfout" class="melding verborgen"></p>
+    </form>
+  </section>
+
+  <section id="beheer" class="verborgen">
+    <div class="balk">
+      <button class="hoofd" id="nieuw">+ Nieuwe activiteit</button>
+      <button id="reeks">+ Wekelijkse repetities</button>
+      <select id="jaarkeuze" aria-label="Jaar"></select>
+      <button id="vakknop">Schoolvakanties ophalen</button>
+      <button id="uit">Uitloggen</button>
+    </div>
+    <details class="kaart" style="padding:10px 14px;margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600">Agendalink voor leden (abonnement)</summary>
+      <p class="meta">Met deze geheime link kunnen leden de planning als abonnement in hun eigen agenda zetten. Repetities in vakanties staan er niet in. Deel de link alleen met leden; wie hem heeft, kan de planning zien. Maak een nieuwe link als hij op de verkeerde plek terecht is gekomen; de oude werkt dan niet meer.</p>
+      <div class="balk" style="margin:8px 0 4px"><input id="icslink" readonly aria-label="Agendalink" style="flex:1 1 260px;width:auto"><button id="icskopie">Kopieer link</button></div>
+      <div class="balk" style="margin:4px 0">
+        <a id="icswebcal" class="knoplink" href="#">Abonneer in Agenda (iPhone/Mac)</a>
+        <a id="icsgoogle" class="knoplink" href="#" target="_blank" rel="noopener">Abonneer in Google Agenda</a>
+        <a id="icstest" class="knoplink" href="#" target="_blank" rel="noopener">Test: bekijk het bestand</a>
+        <button id="icsnieuw" class="gevaar">Nieuwe link</button>
+      </div>
+      <p id="icsfout" class="melding verborgen"></p>
+    </details>
+    <p id="melding" class="melding goed verborgen" role="status"></p>
+    <div id="lijst"></div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h2 id="dlgtitel">Activiteit</h2>
+    <input type="hidden" id="f-id">
+    <div class="veld"><label for="f-titel">Wat</label><input id="f-titel" required maxlength="120" placeholder="bijv. Optreden Korenlint"></div>
+    <div class="veld"><label for="f-soort">Soort</label><select id="f-soort"></select></div>
+    <div class="rij">
+      <div class="veld"><label for="f-datum">Datum</label><input id="f-datum" type="date" required></div>
+      <div class="veld"><label for="f-tm">t/m <small>(alleen bij meerdere dagen)</small></label><input id="f-tm" type="date"></div>
+    </div>
+    <div class="rij">
+      <div class="veld"><label for="f-tijd">Tijd <small>(bijv. 19:30-21:30)</small></label><input id="f-tijd" maxlength="20" inputmode="numeric" placeholder="leeg = hele dag"></div>
+      <div class="veld"><label for="f-waar">Waar</label><input id="f-waar" maxlength="120"></div>
+    </div>
+    <div class="veld"><label for="f-opm">Opmerking</label><input id="f-opm" maxlength="300" placeholder="bijv. betaald optreden, zwarte kleding"></div>
+    <p id="dlgfout" class="melding verborgen"></p>
+    <div class="knoppen">
+      <button type="button" class="gevaar verborgen" id="f-weg">Verwijderen</button>
+      <button type="button" id="f-annuleer">Annuleren</button>
+      <button type="submit" class="hoofd">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg2">
+  <form id="form2" method="dialog">
+    <h2>Wekelijkse repetities toevoegen</h2>
+    <div class="rij">
+      <div class="veld"><label for="r-dag">Dag</label><select id="r-dag"><option value="1">maandag</option><option value="2">dinsdag</option><option value="3" selected>woensdag</option><option value="4">donderdag</option><option value="5">vrijdag</option><option value="6">zaterdag</option><option value="0">zondag</option></select></div>
+      <div class="veld"><label for="r-tijd">Tijd <small>(mag leeg)</small></label><input id="r-tijd" maxlength="20" placeholder="19:30-22:00"></div>
+    </div>
+    <div class="rij">
+      <div class="veld"><label for="r-van">Vanaf</label><input id="r-van" type="date" required></div>
+      <div class="veld"><label for="r-tot">Tot en met</label><input id="r-tot" type="date" required></div>
+    </div>
+    <div class="rij">
+      <div class="veld"><label for="r-titel">Naam</label><input id="r-titel" value="Repetitie" maxlength="120"></div>
+      <div class="veld"><label for="r-waar">Waar</label><input id="r-waar" maxlength="120"></div>
+    </div>
+    <div class="veld"><label><input type="checkbox" id="r-vak" checked style="width:auto;min-height:0"> Sla dagen met al een repetitie over (in vakanties vervalt de repetitie sowieso)</label></div>
+    <p id="r-preview" class="meta"></p>
+    <p id="dlg2fout" class="melding verborgen"></p>
+    <div class="knoppen">
+      <button type="button" id="r-annuleer">Annuleren</button>
+      <button type="submit" class="hoofd" id="r-ok">Toevoegen</button>
+    </div>
+  </form>
+</dialog>
