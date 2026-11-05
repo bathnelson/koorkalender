@@ -81,11 +81,11 @@ function jaar() {
       if ((start + d) % 7 === 0) { tbody.append(rij); rij = el('tr'); }
     }
     if (rij.children.length) tbody.append(rij);
-    raster.append(el('section', {class: 'kaart mini' + (n === 0 ? ' deze-maand' : ''), 'aria-current': n === 0 ? 'date' : false}, el('h3', {}, MAANDEN[m] + ' ' + J),
+    raster.append(el('section', {class: 'kaart mini' + (n === 0 ? ' deze-maand' : ''), 'aria-current': n === 0 ? 'date' : false}, el('h3', {}, el('button', {class: 'maandknop', title: 'Open ' + MAANDEN[m] + ' in de maandweergave', onclick: () => { MAAND = new Date(J, m, 1); TAB = 'maand'; GEKOZEN = null; teken(); scrollTo(0, 0); }}, MAANDEN[m] + ' ' + J + ' ›')),
       el('table', {}, el('thead', {}, el('tr', {}, ['ma','di','wo','do','vr','za','zo'].map(d => el('th', {}, d)))), tbody)));
   }
   return [el('div', {style: 'display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 4px 10px'},
-      el('p', {class: 'meta', style: 'margin:0'}, 'De komende 12 maanden. Tik op een dag voor de details.'),
+      el('p', {class: 'meta', style: 'margin:0'}, 'De komende 12 maanden. Tik op een dag voor de details, of op de naam van een maand om die maand te openen.'),
       el('a', {class: 'knoplink', href: 'afdrukken.html'}, 'Afdrukken')), legenda(), raster, ...dagDetail()];
 }
 
