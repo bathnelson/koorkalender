@@ -297,6 +297,8 @@ function ics(array $items, array $cfg): void {
         $titel = ($it['soort'] === 'Onder voorbehoud' ? 'Onder voorbehoud: ' : '') . $it['titel'];
         $r[] = 'SUMMARY:' . icsTekst($titel);
         $r[] = 'CATEGORIES:' . icsTekst($it['soort']);
+        $kleur = ['Repetitie' => 'lightsteelblue', 'Extra repetitie' => 'mediumturquoise', 'Optreden' => 'salmon', 'Onder voorbehoud' => 'gold', 'Vergadering' => 'mediumpurple', 'Vakantie' => 'yellowgreen', 'Overig' => 'sandybrown'][$it['soort']] ?? '';
+        if ($kleur !== '') $r[] = 'COLOR:' . $kleur; // RFC 7986: CSS-kleurnaam
         $r[] = 'STATUS:' . ($it['soort'] === 'Onder voorbehoud' ? 'TENTATIVE' : 'CONFIRMED');
         if ($it['waar'] !== '') $r[] = 'LOCATION:' . icsTekst($it['waar']);
         if ($it['opmerking'] !== '') $r[] = 'DESCRIPTION:' . icsTekst($it['opmerking']);
