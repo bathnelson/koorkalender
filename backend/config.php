@@ -16,6 +16,10 @@ return [
     // Zet hier het adres van jullie GitHub Pages. Staan de pagina's op dezelfde server als api.php, dan hoeft hier niets.
     'toegestane_origins' => [],
 
+    // Korte naam die in het agenda-abonnement voor elke afspraak komt, bijvoorbeeld 'KOOR' geeft "[KOOR] Repetitie".
+    // Leeg laten voor geen voorvoegsel.
+    'ics_voorvoegsel' => '',
+
     // Tijdzone voor het agenda-abonnement
     'tijdzone' => 'Europe/Amsterdam',
 ];

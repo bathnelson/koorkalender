@@ -295,6 +295,8 @@ function ics(array $items, array $cfg): void {
             $r[] = 'TRANSP:TRANSPARENT';
         }
         $titel = ($it['soort'] === 'Onder voorbehoud' ? 'Onder voorbehoud: ' : '') . $it['titel'];
+        $voor = trim((string)($cfg['ics_voorvoegsel'] ?? ''));
+        if ($voor !== '') $titel = "[$voor] " . $titel;
         $r[] = 'SUMMARY:' . icsTekst($titel);
         $r[] = 'CATEGORIES:' . icsTekst($it['soort']);
         $kleur = ['Repetitie' => 'lightsteelblue', 'Extra repetitie' => 'mediumturquoise', 'Optreden' => 'salmon', 'Onder voorbehoud' => 'gold', 'Vergadering' => 'mediumpurple', 'Vakantie' => 'yellowgreen', 'Overig' => 'sandybrown'][$it['soort']] ?? '';
