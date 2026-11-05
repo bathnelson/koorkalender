@@ -9,6 +9,11 @@ return [
     // Mag ook een hash zijn die begint met $2y$ (gemaakt met password_hash).
     'wachtwoord' => 'verander-mij',
 
+    // Ledencode: vul hier een code in om de kalender af te schermen voor niet-leden.
+    // Leden komen dan binnen via de geheime ledenlink (zie de beheerpagina) of door deze code één keer in te typen.
+    // Leeg laten = de kalender is voor iedereen met het adres te zien.
+    'leden_code' => '',
+
     // Regio voor de schoolvakanties: noord, midden of zuid
     'regio' => 'noord',
 

@@ -118,10 +118,13 @@ document.getElementById('jaarkeuze').onchange = e => { JAAR = Number(e.target.va
 try { TAB = localStorage.getItem('kk-tab') || TAB; } catch (e) {}
 
 
-fetch(apiUrl('actie=lijst'), {cache: 'no-store'}).then(r => r.json()).then(d => {
+function start() {
+  haalLijst().then(d => {
   ITEMS = zichtbaar(d.items || []);
   if (d.naam) { document.getElementById('naam').textContent = 'Jaarplanning ' + d.naam; document.title = 'Jaarplanning ' + d.naam; }
   const sel = document.getElementById('jaarkeuze');
   sel.replaceChildren(...jarenVan(ITEMS).map(j => el('option', {value: j, selected: j === JAAR}, String(j))));
   teken();
-}).catch(() => { inhoud.replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden. Probeer het later opnieuw.')); });
+}).catch(e => e.afgeschermd ? vraagLedencode(inhoud, start) : inhoud.replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden. Probeer het later opnieuw.')));
+}
+start();

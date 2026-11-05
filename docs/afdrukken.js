@@ -150,12 +150,15 @@ function teken() {
   $('bladen').replaceChildren(blad1, blad2);
 }
 
-fetch(apiUrl('actie=lijst'), {cache: 'no-store'}).then(r => r.json()).then(d => {
+function start() {
+haalLijst().then(d => {
   ALLES = d.items || []; NAAM = d.naam || '';
   document.title = 'Jaarplanning ' + NAAM + ' afdrukken';
   $('periode').replaceChildren(...periodes().map((p, i) => el('option', {value: i}, p.label)));
   teken();
-}).catch(() => $('bladen').replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden.')));
+}).catch(e => e.afgeschermd ? vraagLedencode($('bladen'), start) : $('bladen').replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden.')));
+}
+start();
 $('periode').onchange = teken;
 $('weergave').onchange = teken;
 $('richting').onchange = teken;

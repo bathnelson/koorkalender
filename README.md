@@ -21,6 +21,10 @@ De pagina's en `api.php` staan op hetzelfde domein, dus er is geen extra instell
 - **De app aanpassen**: wijzig de bestanden in `docs/` en push naar `main`. GitHub Pages publiceert het binnen een paar minuten (de cache kan tot 10 minuten duren).
 - **De host hoef je alleen aan te raken als `api.php` verandert.** De html op de host blijft altijd gelijk.
 
+## Afschermen voor leden
+
+Vul in `config.php` een `leden_code` in. De kalender is dan alleen te zien voor wie via de geheime ledenlink komt (te vinden op de beheerpagina, onder "Ledenlink") of die code één keer intypt. De browser onthoudt dat. Het agenda-abonnement werkt met een eigen geheime link en blijft gewoon werken.
+
 ## Wat er niet in git staat
 
 De planning (`data/planning.json`), het echte wachtwoord, de agendasleutel, de inlogsleutel en de reservekopieën staan alleen op de host.

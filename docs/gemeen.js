@@ -68,3 +68,44 @@ function vervalt(it, items) {
   return it.soort === 'Repetitie' && items.some(v => v.soort === 'Vakantie' && v.datum <= it.datum && eind(v) >= it.datum);
 }
 function zichtbaar(items) { return items.filter(i => !vervalt(i, items)); }
+
+// ---------- toegang voor leden ----------
+// Komt iemand binnen via de geheime ledenlink (?k=...), dan onthoudt de browser de sleutel en verdwijnt hij uit de adresbalk.
+let LEDEN = ''; try { LEDEN = localStorage.getItem('kk-leden') || ''; } catch (e) {}
+(function () {
+  const u = new URL(location.href), k = u.searchParams.get('k');
+  if (!k) return;
+  LEDEN = k; try { localStorage.setItem('kk-leden', k); } catch (e) {}
+  u.searchParams.delete('k'); history.replaceState(null, '', u.pathname + u.search + u.hash);
+})();
+
+async function haalLijst() {
+  const r = await fetch(apiUrl('actie=lijst'), {cache: 'no-store', headers: LEDEN ? {'X-Leden': LEDEN} : {}});
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && d.afgeschermd) { const e = new Error(d.fout); e.afgeschermd = true; throw e; }
+  if (!r.ok) throw new Error(d.fout || 'De planning kon niet geladen worden.');
+  return d;
+}
+
+// Toont het invulveld voor de ledencode in 'doel' en roept 'verder' aan zodra de code klopt
+function vraagLedencode(doel, verder) {
+  const invoer = el('input', {type: 'text', autocomplete: 'off', autocapitalize: 'none', 'aria-label': 'Ledencode', required: true, style: 'flex:1 1 160px;width:auto'});
+  const melding = el('p', {class: 'melding verborgen', role: 'alert'});
+  const knop = el('button', {class: 'hoofd', type: 'submit'}, 'Open de kalender');
+  const form = el('form', {class: 'kaart', style: 'padding:16px;max-width:460px'},
+    el('h2', {style: 'margin:0 0 6px;font-size:1.1rem'}, 'Alleen voor leden'),
+    el('p', {class: 'meta', style: 'margin:0 0 10px'}, 'Vul de ledencode in. Die vind je bij de link op de ledensite, of vraag hem aan de secretaris. Je hoeft dit maar één keer te doen.'),
+    el('div', {class: 'balk'}, invoer, knop), melding);
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault(); knop.disabled = true; melding.classList.add('verborgen');
+    try {
+      const r = await fetch(apiUrl('actie=ledencode'), {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code: invoer.value})});
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.fout || 'Er ging iets mis.');
+      LEDEN = d.sleutel || ''; try { localStorage.setItem('kk-leden', LEDEN); } catch (e) {}
+      verder();
+    } catch (e) { melding.textContent = e.message; melding.classList.remove('verborgen'); knop.disabled = false; invoer.select(); }
+  });
+  doel.replaceChildren(form);
+  invoer.focus();
+}

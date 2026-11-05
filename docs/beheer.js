@@ -99,10 +99,20 @@ $('f-soort').replaceChildren(...SOORTEN.map(s => el('option', {value: s}, s)));
 
 async function laad() {
   ITEMS = (await api('lijst')).items || []; tekenLijst();
+  api('leden_link', {}).then(toonLeden).catch(e => zeg('Ledenlink ophalen lukte niet: ' + e.message));
   api('ics_link', {}).then(d => toonIcs(d.sleutel)).catch(e => fout('icsfout', 'Agendalink maken lukte niet: ' + e.message));
   // Schoolvakanties van dit en volgend schooljaar automatisch ophalen (eenmalig per schooljaar)
   api('vakanties', {automatisch: true}).then(d => meldVakanties(d, true)).catch(e => zeg('Schoolvakanties ophalen lukte niet: ' + e.message));
 }
+function toonLeden(d) {
+  $('ledenlink').value = new URL('./?k=' + d.sleutel, location.href).href;
+  $('ledenuit').classList.toggle('verborgen', d.afgeschermd);
+}
+$('ledenkopie').onclick = async () => { try { await navigator.clipboard.writeText($('ledenlink').value); zeg('Ledenlink gekopieerd.'); } catch (e) { $('ledenlink').select(); } };
+$('ledennieuw').onclick = async () => {
+  if (!confirm('Nieuwe ledenlink maken? De oude link werkt dan niet meer; vervang hem ook op de ledensite.')) return;
+  try { toonLeden(await api('leden_link', {nieuw: true})); zeg('Nieuwe ledenlink gemaakt.'); } catch (e) { alert(e.message); }
+};
 function toonIcs(sleutel) {
   const https = new URL(apiUrl('actie=ics&sleutel=' + sleutel), location.href).href;
   const webcal = https.replace(/^https?:/, 'webcal:');

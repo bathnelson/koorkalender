@@ -32,6 +32,12 @@
       </div>
       <p id="icsfout" class="melding verborgen"></p>
     </details>
+    <details class="kaart" style="padding:10px 14px;margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600">Ledenlink (afgeschermde kalender)</summary>
+      <p id="ledenuit" class="melding verborgen">De afscherming staat uit: iedereen met het adres kan de kalender zien. Zet een ledencode in config.php op de server om hem af te schermen.</p>
+      <p class="meta">Zet deze link achter het icoontje op de ledensite. Wie via deze link komt, ziet de kalender meteen; de telefoon onthoudt dat. Wie zonder link komt, moet de ledencode uit config.php intypen. Maak een nieuwe link als hij uitgelekt is; leden die via de oude link binnenkwamen, moeten dan opnieuw via de nieuwe link of de code.</p>
+      <div class="balk" style="margin:8px 0 4px"><input id="ledenlink" readonly aria-label="Ledenlink" style="flex:1 1 260px;width:auto"><button id="ledenkopie">Kopieer link</button><button id="ledennieuw" class="gevaar">Nieuwe link</button></div>
+    </details>
     <p id="melding" class="melding goed verborgen" role="status"></p>
     <div id="lijst"></div>
   </section>

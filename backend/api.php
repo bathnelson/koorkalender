@@ -14,7 +14,7 @@ date_default_timezone_set($CONFIG['tijdzone'] ?? 'Europe/Amsterdam');
 $herkomst = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (is_string($herkomst) && $herkomst !== '' && in_array(rtrim($herkomst, '/'), $CONFIG['toegestane_origins'] ?? [], true)) {
     header('Access-Control-Allow-Origin: ' . $herkomst);
-    header('Access-Control-Allow-Headers: Content-Type, X-Token');
+    header('Access-Control-Allow-Headers: Content-Type, X-Token, X-Leden');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
     header('Access-Control-Max-Age: 600');
 }
@@ -152,6 +152,24 @@ function icsSleutel(bool $nieuw = false): string {
     $sleutel = bin2hex(random_bytes(12));
     wijzig(function ($d) use ($sleutel) { $d['instellingen']['ics_sleutel'] = $sleutel; return $d; });
     return $sleutel;
+}
+
+// ---------- afscherming voor leden ----------
+// Staat aan zodra in config.php een ledencode is ingevuld. Leden komen binnen met de geheime ledenlink (?k=...)
+// of door de ledencode in te typen; daarna onthoudt hun browser de sleutel.
+function ledenAfgeschermd(array $cfg): bool { return trim((string)($cfg['leden_code'] ?? '')) !== ''; }
+function ledenSleutel(bool $nieuw = false): string {
+    $data = laad();
+    if (!$nieuw && !empty($data['instellingen']['leden_sleutel'])) return $data['instellingen']['leden_sleutel'];
+    $sleutel = bin2hex(random_bytes(12));
+    wijzig(function ($d) use ($sleutel) { $d['instellingen']['leden_sleutel'] = $sleutel; return $d; });
+    return $sleutel;
+}
+function magLijstZien(array $cfg): bool {
+    if (!ledenAfgeschermd($cfg) || ingelogd()) return true;
+    $gegeven = $_SERVER['HTTP_X_LEDEN'] ?? '';
+    $goed = laad()['instellingen']['leden_sleutel'] ?? '';
+    return is_string($gegeven) && $goed !== '' && hash_equals($goed, $gegeven);
 }
 
 // ---------- schoolvakanties (open data Rijksoverheid) ----------
@@ -319,6 +337,7 @@ $actie = $_GET['actie'] ?? '';
 $methode = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($methode === 'GET' && $actie === 'lijst') {
+    if (!magLijstZien($CONFIG)) antwoord(['fout' => 'Deze kalender is alleen voor leden.', 'afgeschermd' => true], 401);
     antwoord(['naam' => $CONFIG['naam'] ?? '', 'soorten' => SOORTEN, 'items' => laad()['items']]);
 }
 if ($methode === 'GET' && $actie === 'ics') {
@@ -372,6 +391,14 @@ switch ($actie) {
             return $d;
         });
         antwoord(['ok' => true, 'items' => $data['items']]);
+    case 'ledencode':
+        if (!ledenAfgeschermd($CONFIG)) antwoord(['sleutel' => '']);
+        $code = is_string($invoer['code'] ?? null) ? trim($invoer['code']) : '';
+        if (!hash_equals(strtolower(trim((string)$CONFIG['leden_code'])), strtolower($code))) { sleep(2); fout('Die code klopt niet.', 401); }
+        antwoord(['sleutel' => ledenSleutel()]);
+    case 'leden_link':
+        vereisBeheer();
+        antwoord(['sleutel' => ledenSleutel(!empty($invoer['nieuw'])), 'afgeschermd' => ledenAfgeschermd($CONFIG)]);
     case 'ics_link':
         vereisBeheer();
         antwoord(['sleutel' => icsSleutel(!empty($invoer['nieuw']))]);
