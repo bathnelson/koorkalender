@@ -22,6 +22,7 @@ header.kop{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 
 header.kop h1{font-size:1.35rem;margin:0;flex:1 1 0;min-width:0;line-height:1.2}
 .ikonen{display:flex;gap:4px;margin-left:auto;align-self:flex-start}
 .ikoon{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;color:var(--accent)}
+.ikoon.tekstknop{width:auto;min-height:0;padding:0 10px;gap:6px;border:1px solid var(--lijn);background:var(--kaart);font-size:.85rem;font-weight:600;white-space:nowrap}
 .ikoon:hover,.ikoon:focus-visible{background:rgba(127,127,127,.15)}
 select,input,textarea,button{font:inherit;color:inherit}
 select,input,textarea{background:var(--kaart);border:1px solid var(--lijn);border-radius:8px;padding:8px 10px;min-height:42px;width:100%}
@@ -107,3 +108,4 @@ dialog h2{margin:0 0 12px;font-size:1.2rem}
 .groot .nr{font-size:.8rem;font-weight:600}
 .groot .chipje{display:block;font-size:.62rem;line-height:1.25;border-radius:4px;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tekst)}
 @media (min-width:700px){.groot td button{min-height:90px}.groot .chipje{font-size:.75rem}.groot .nr{font-size:.9rem}}
+@media (max-width:520px){header.kop h1{flex:1 1 100%}.ikonen{margin-left:0;width:100%;justify-content:flex-end}}
