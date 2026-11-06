@@ -272,6 +272,13 @@ function importeerVakanties(array $schooljaren, array $cfg): array {
 }
 
 // ---------- agenda-abonnement ----------
+// Links (en alles wat een agenda-app als link herkent) gaan niet mee in het abonnement,
+// zodat een valse afspraak geen aanklikbare phishinglink kan bevatten.
+function zonderLinks(string $s): string {
+    $s = preg_replace('~\b(?:https?|ftp|mailto|tel|webcal)://?\S+~i', '[link verwijderd]', $s);
+    $s = preg_replace('~\b(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,24}(?:/\S*)?\b~i', '[link verwijderd]', $s);
+    return preg_replace('~\S+@\[link verwijderd\]~', '[link verwijderd]', $s);
+}
 function icsTekst(string $s): string { return str_replace(["\\", ';', ',', "\n"], ["\\\\", '\;', '\,', '\n'], $s); }
 function icsRegel(string $r): string {
     $uit = '';
@@ -315,13 +322,13 @@ function ics(array $items, array $cfg): void {
         $titel = ($it['soort'] === 'Onder voorbehoud' ? 'Onder voorbehoud: ' : '') . $it['titel'];
         $voor = trim((string)($cfg['ics_voorvoegsel'] ?? ''));
         if ($voor !== '') $titel = "[$voor] " . $titel;
-        $r[] = 'SUMMARY:' . icsTekst($titel);
+        $r[] = 'SUMMARY:' . icsTekst(zonderLinks($titel));
         $r[] = 'CATEGORIES:' . icsTekst($it['soort']);
         $kleur = ['Repetitie' => 'lightsteelblue', 'Extra repetitie' => 'mediumturquoise', 'Optreden' => 'salmon', 'Onder voorbehoud' => 'gold', 'Vergadering' => 'mediumpurple', 'Vakantie' => 'yellowgreen', 'Overig' => 'sandybrown'][$it['soort']] ?? '';
         if ($kleur !== '') $r[] = 'COLOR:' . $kleur; // RFC 7986: CSS-kleurnaam
         $r[] = 'STATUS:' . ($it['soort'] === 'Onder voorbehoud' ? 'TENTATIVE' : 'CONFIRMED');
-        if ($it['waar'] !== '') $r[] = 'LOCATION:' . icsTekst($it['waar']);
-        if ($it['opmerking'] !== '') $r[] = 'DESCRIPTION:' . icsTekst($it['opmerking']);
+        if ($it['waar'] !== '') $r[] = 'LOCATION:' . icsTekst(zonderLinks($it['waar']));
+        if ($it['opmerking'] !== '') $r[] = 'DESCRIPTION:' . icsTekst(zonderLinks($it['opmerking']));
         $r[] = 'END:VEVENT';
     }
     $r[] = 'END:VCALENDAR';
