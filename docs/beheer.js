@@ -115,10 +115,7 @@ $('ledennieuw').onclick = async () => {
 };
 function toonIcs(sleutel) {
   const https = new URL(apiUrl('actie=ics&sleutel=' + sleutel), location.href).href;
-  const webcal = https.replace(/^https?:/, 'webcal:');
   $('icslink').value = https;
-  $('icswebcal').href = webcal;
-  $('icsgoogle').href = 'https://calendar.google.com/calendar/render?cid=' + encodeURIComponent(webcal);
   $('icstest').href = https;
 }
 function meldVakanties(d, automatisch) {

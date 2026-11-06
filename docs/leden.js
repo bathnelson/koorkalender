@@ -118,9 +118,24 @@ document.getElementById('jaarkeuze').onchange = e => { JAAR = Number(e.target.va
 try { TAB = localStorage.getItem('kk-tab') || TAB; } catch (e) {}
 
 
+function zetAbonnement(sleutel) {
+  const https = new URL(apiUrl('actie=ics&sleutel=' + sleutel), location.href).href, webcal = https.replace(/^https?:/, 'webcal:');
+  document.getElementById('abo-webcal').href = webcal;
+  document.getElementById('abo-google').href = 'https://calendar.google.com/calendar/render?cid=' + encodeURIComponent(webcal);
+  document.getElementById('abo-kopie').onclick = async () => {
+    const m = document.getElementById('abo-melding');
+    try { await navigator.clipboard.writeText(https); m.textContent = 'Link gekopieerd. Plak hem in je agenda-app bij "abonnement" of "agenda via URL".'; }
+    catch (e) { m.textContent = https; }
+    m.classList.remove('verborgen');
+  };
+  const knop = document.getElementById('abonneer');
+  knop.classList.remove('verborgen');
+  knop.onclick = () => document.getElementById('dlg-abo').showModal();
+}
 function start() {
   haalLijst().then(d => {
   ITEMS = zichtbaar(d.items || []);
+  if (d.ics) zetAbonnement(d.ics);
   if (d.naam) { document.getElementById('naam').textContent = 'Jaarplanning ' + d.naam; document.title = 'Jaarplanning ' + d.naam; }
   const sel = document.getElementById('jaarkeuze');
   sel.replaceChildren(...jarenVan(ITEMS).map(j => el('option', {value: j, selected: j === JAAR}, String(j))));

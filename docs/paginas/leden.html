@@ -4,6 +4,7 @@
     <label class="verborgen" for="jaarkeuze">Jaar</label>
     <select id="jaarkeuze" class="verborgen" style="width:auto"></select>
     <nav class="ikonen">
+      <button class="ikoon verborgen" id="abonneer" type="button" title="Zet in je eigen agenda" aria-label="Zet in je eigen agenda"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M12 14v5M9.5 16.5h5"/></svg></button>
       <a class="ikoon" href="afdrukken.html" title="Afdrukversie" aria-label="Afdrukversie"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>
       <a class="ikoon" href="beheer.html" title="Beheer (secretaris)" aria-label="Beheer (secretaris)"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></a>
     </nav>
@@ -15,6 +16,21 @@
     <button role="tab" id="tab-jaar" aria-selected="false">Jaar</button>
     <button role="tab" id="tab-lijst" aria-selected="false">Lijst</button>
   </div>
+
+<dialog id="dlg-abo">
+  <form method="dialog">
+    <h2>In je eigen agenda</h2>
+    <p class="meta">Met een abonnement staat de planning in de agenda op je telefoon of computer en werkt hij zichzelf bij. Repetities in vakanties staan er niet in. Deel deze link alleen met leden.</p>
+    <div class="balk" style="flex-direction:column;align-items:stretch;gap:8px;margin:12px 0">
+      <a id="abo-webcal" class="knoplink" href="#">Abonneer in Agenda (iPhone, iPad, Mac)</a>
+      <a id="abo-google" class="knoplink" href="#" target="_blank" rel="noopener">Abonneer in Google Agenda</a>
+      <button id="abo-kopie" type="button">Kopieer de link (Outlook en andere)</button>
+    </div>
+    <p class="meta">Werkt de knop niet? iPhone: Instellingen &gt; Agenda &gt; Accounts &gt; Voeg account toe &gt; Andere &gt; Voeg agenda-abonnement toe, en plak de link. Google Agenda op de computer: Andere agenda's &gt; + &gt; Via URL.</p>
+    <p id="abo-melding" class="melding goed verborgen" role="status"></p>
+    <div class="balk" style="justify-content:flex-end"><button class="hoofd" value="sluit">Sluiten</button></div>
+  </form>
+</dialog>
 
   <main id="inhoud"><p class="leeg">Planning wordt geladen…</p></main>
 

@@ -338,7 +338,7 @@ $methode = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($methode === 'GET' && $actie === 'lijst') {
     if (!magLijstZien($CONFIG)) antwoord(['fout' => 'Deze kalender is alleen voor leden.', 'afgeschermd' => true], 401);
-    antwoord(['naam' => $CONFIG['naam'] ?? '', 'soorten' => SOORTEN, 'items' => laad()['items']]);
+    antwoord(['naam' => $CONFIG['naam'] ?? '', 'soorten' => SOORTEN, 'items' => laad()['items'], 'ics' => icsSleutel()]);
 }
 if ($methode === 'GET' && $actie === 'ics') {
     $sleutel = $_GET['sleutel'] ?? '';
