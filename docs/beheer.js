@@ -117,6 +117,7 @@ function toonIcs(sleutel) {
   const https = new URL(apiUrl('actie=ics&sleutel=' + sleutel), location.href).href;
   $('icslink').value = https;
   $('icstest').href = https;
+  $('icsoutlook').href = 'https://outlook.live.com/calendar/0/addfromweb?url=' + encodeURIComponent(https) + '&name=' + encodeURIComponent('Jaarplanning');
 }
 function meldVakanties(d, automatisch) {
   // Een schooljaar dat Rijksoverheid nog niet heeft gepubliceerd (404) is bij automatisch ophalen geen melding waard

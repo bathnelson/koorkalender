@@ -123,7 +123,6 @@ function zetAbonnement(sleutel) {
   const https = new URL(apiUrl('actie=ics&sleutel=' + sleutel), location.href).href, webcal = https.replace(/^https?:/, 'webcal:');
   document.getElementById('abo-webcal').href = webcal;
   document.getElementById('abo-google').href = 'https://calendar.google.com/calendar/render?cid=' + encodeURIComponent(webcal);
-  document.getElementById('abo-outlook').href = 'https://outlook.live.com/calendar/0/addfromweb?url=' + encodeURIComponent(https) + '&name=' + encodeURIComponent('Jaarplanning ' + (NAAM_KOOR || 'koor'));
   document.getElementById('abo-kopie').onclick = async () => {
     const m = document.getElementById('abo-melding');
     try { await navigator.clipboard.writeText(https); m.textContent = 'Link gekopieerd. Plak hem in je agenda-app bij "abonnement", "agenda via URL" of "abonneren via internet".'; }
