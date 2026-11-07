@@ -41,6 +41,12 @@ function metaTekst(it) {
   return delen.join(' · ');
 }
 
+function programma(it) {
+  const lijst = (it.liedjes || '').split('\n').filter(Boolean);
+  if (!lijst.length) return null;
+  return el('details', {class: 'programma'}, el('summary', {}, 'Programma (' + lijst.length + (lijst.length === 1 ? ' liedje)' : ' liedjes)')),
+    el('ol', {}, lijst.map(l => el('li', {}, l))));
+}
 function itemRij(it, extra) {
   const d = naarDatum(it.datum);
   return el('div', {class: 'item' + (eind(it) < vandaagIso() ? ' voorbij' : '')},
@@ -48,7 +54,8 @@ function itemRij(it, extra) {
     el('div', {class: 'info'},
       el('div', {class: 'titel'}, it.titel),
       metaTekst(it) ? el('div', {class: 'meta'}, metaTekst(it)) : null,
-      el('span', {class: 'chip ' + soortKlasse(it.soort)}, it.soort)),
+      el('span', {class: 'chip ' + soortKlasse(it.soort)}, it.soort),
+      programma(it)),
     extra || null);
 }
 

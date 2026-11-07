@@ -79,6 +79,12 @@ function tekst($v, int $max): string {
     $v = is_string($v) ? trim(preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $v)) : '';
     return mb_substr($v, 0, $max);
 }
+// Programma van een optreden: één liedje per regel, in volgorde (hooguit 40 regels van 100 tekens)
+function liedjes($v): string {
+    if (!is_string($v)) return '';
+    $regels = array_filter(array_map(function ($r) { return tekst(preg_replace('/^\s*\d+[.)]\s*/', '', $r), 100); }, preg_split('/\R/', $v)), 'strlen');
+    return implode("\n", array_slice(array_values($regels), 0, 40));
+}
 function schoonItem($in): array {
     if (!is_array($in)) fout('Ongeldige activiteit.');
     $item = [
@@ -90,6 +96,7 @@ function schoonItem($in): array {
         'soort' => $in['soort'] ?? '',
         'waar' => tekst($in['waar'] ?? '', 120),
         'opmerking' => tekst($in['opmerking'] ?? '', 300),
+        'liedjes' => liedjes($in['liedjes'] ?? ''),
     ];
     if (!geldigeDatum($item['datum'])) fout('Vul een geldige datum in.');
     if ($item['tm'] !== '' && (!geldigeDatum($item['tm']) || $item['tm'] < $item['datum'])) fout('De datum bij "t/m" moet na de begindatum liggen.');
@@ -328,7 +335,12 @@ function ics(array $items, array $cfg): void {
         if ($kleur !== '') $r[] = 'COLOR:' . $kleur; // RFC 7986: CSS-kleurnaam
         $r[] = 'STATUS:' . ($it['soort'] === 'Onder voorbehoud' ? 'TENTATIVE' : 'CONFIRMED');
         if ($it['waar'] !== '') $r[] = 'LOCATION:' . icsTekst(zonderLinks($it['waar']));
-        if ($it['opmerking'] !== '') $r[] = 'DESCRIPTION:' . icsTekst(zonderLinks($it['opmerking']));
+        $omschr = $it['opmerking'];
+        if (($it['liedjes'] ?? '') !== '') {
+            $n = 0;
+            $omschr .= ($omschr !== '' ? "\n\n" : '') . "Programma:\n" . implode("\n", array_map(function ($l) use (&$n) { return (++$n) . '. ' . $l; }, explode("\n", $it['liedjes'])));
+        }
+        if ($omschr !== '') $r[] = 'DESCRIPTION:' . icsTekst(zonderLinks($omschr));
         $r[] = 'END:VEVENT';
     }
     $r[] = 'END:VCALENDAR';

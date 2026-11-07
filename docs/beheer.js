@@ -39,7 +39,7 @@ function bewerk(it) {
   it = it || {id: '', titel: '', soort: 'Optreden', datum: '', tm: '', tijd: '', waar: '', opmerking: ''};
   $('dlgtitel').textContent = it.id ? 'Activiteit wijzigen' : 'Nieuwe activiteit';
   $('f-id').value = it.id; $('f-titel').value = it.titel; $('f-soort').value = it.soort; $('f-datum').value = it.datum;
-  $('f-tm').value = it.tm; $('f-tijd').value = it.tijd; $('f-waar').value = it.waar; $('f-opm').value = it.opmerking || '';
+  $('f-tm').value = it.tm; $('f-tijd').value = it.tijd; $('f-waar').value = it.waar; $('f-opm').value = it.opmerking || ''; $('f-liedjes').value = it.liedjes || ''; toonLiedjesVeld();
   $('f-weg').classList.toggle('verborgen', !it.id); fout('dlgfout');
   $('f-weg').onclick = () => { $('dlg').close(); weg(it); };
   $('dlg').showModal();
@@ -53,10 +53,13 @@ async function weg(it) {
 $('form').addEventListener('submit', async e => {
   e.preventDefault();
   const item = {id: $('f-id').value || undefined, titel: $('f-titel').value, soort: $('f-soort').value, datum: $('f-datum').value,
-    tm: $('f-tm').value, tijd: $('f-tijd').value, waar: $('f-waar').value, opmerking: $('f-opm').value};
+    tm: $('f-tm').value, tijd: $('f-tijd').value, waar: $('f-waar').value, opmerking: $('f-opm').value, liedjes: $('f-liedjes').value};
   try { const d = await api('opslaan', {item}); ITEMS = d.items; JAAR = Number(d.item.datum.slice(0, 4)); tekenLijst(); $('dlg').close(); zeg('Opgeslagen: ' + d.item.titel + ' (' + kort(d.item.datum) + ').'); }
   catch (err) { fout('dlgfout', err.message); }
 });
+// Het programma-veld alleen bij optredens tonen (of als er al liedjes in staan)
+function toonLiedjesVeld() { $('v-liedjes').classList.toggle('verborgen', !['Optreden', 'Onder voorbehoud'].includes($('f-soort').value) && !$('f-liedjes').value.trim()); }
+$('f-soort').addEventListener('change', toonLiedjesVeld);
 $('f-annuleer').onclick = () => $('dlg').close();
 $('nieuw').onclick = () => bewerk(null);
 

@@ -114,3 +114,8 @@ details.geweest>summary{cursor:pointer;color:var(--zacht);font-weight:600;paddin
 details.geweest:not(.jaar) .kaart{opacity:.75}
 h2.jaarkop{font-size:1.15rem;margin:14px 4px 0;color:var(--accent)}
 details.jaar>summary{font-size:1.15rem;color:var(--accent);padding:14px 4px 6px}
+textarea{min-height:0;resize:vertical}
+details.programma{margin-top:6px;font-size:.92rem}
+details.programma>summary{cursor:pointer;color:var(--accent);font-weight:600}
+details.programma ol{margin:6px 0 2px;padding-left:1.6em}
+details.programma li{margin:2px 0}
