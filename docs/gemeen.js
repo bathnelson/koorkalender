@@ -110,19 +110,28 @@ function vraagLedencode(doel, verder) {
   invoer.focus();
 }
 
-// Lijst per maand; wat al voorbij is komt in een ingeklapt blok "Geweest" bovenaan
+// Lijst per maand. Wat voorbij is staat ingeklapt onder "Geweest".
+// Zonder 'jaar' (ledenlijst): dit jaar staat open en latere jaren zijn ingeklapt. Met 'jaar' (beheer): alles van dat jaar open.
 function maandLijst(items, rij, jaar) {
   const blokken = lijst => {
     const uit = []; let maand = null, kaart = null;
     for (const it of lijst) {
       const d = naarDatum(it.datum), mk = it.datum.slice(0, 7);
-      if (mk !== maand) { maand = mk; uit.push(el('h2', {class: 'maand'}, MAANDEN[d.getMonth()] + (d.getFullYear() !== jaar ? ' ' + d.getFullYear() : ''))); kaart = el('div', {class: 'kaart'}); uit.push(kaart); }
+      if (mk !== maand) { maand = mk; uit.push(el('h2', {class: 'maand'}, MAANDEN[d.getMonth()] + (jaar && d.getFullYear() !== jaar ? ' ' + d.getFullYear() : ''))); kaart = el('div', {class: 'kaart'}); uit.push(kaart); }
       kaart.append(rij(it));
     }
     return uit;
   };
-  const nu = vandaagIso(), geweest = items.filter(i => eind(i) < nu), komend = items.filter(i => eind(i) >= nu);
+  const nu = vandaagIso(), ditJaar = Number(nu.slice(0, 4));
+  const geweest = items.filter(i => eind(i) < nu), komend = items.filter(i => eind(i) >= nu);
   const delen = [];
   if (geweest.length) delen.push(el('details', {class: 'geweest'}, el('summary', {}, 'Geweest (' + geweest.length + ')'), blokken(geweest)));
-  return delen.concat(blokken(komend));
+  if (jaar) return delen.concat(blokken(komend));
+  const jaren = [...new Set(komend.map(i => Math.max(ditJaar, Number(i.datum.slice(0, 4)))))].sort();
+  for (const j of jaren) {
+    const inJ = komend.filter(i => Math.max(ditJaar, Number(i.datum.slice(0, 4))) === j);
+    if (j === ditJaar) delen.push(el('h2', {class: 'jaarkop'}, String(j)), ...blokken(inJ));
+    else delen.push(el('details', {class: 'geweest jaar'}, el('summary', {}, String(j) + ' (' + inJ.length + ')'), blokken(inJ)));
+  }
+  return delen;
 }

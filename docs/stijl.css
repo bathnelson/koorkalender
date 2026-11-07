@@ -111,4 +111,6 @@ dialog h2{margin:0 0 12px;font-size:1.2rem}
 @media (max-width:520px){header.kop h1{flex:1 1 100%}}
 details.geweest{margin:4px 0 8px}
 details.geweest>summary{cursor:pointer;color:var(--zacht);font-weight:600;padding:8px 4px}
-details.geweest .kaart{opacity:.75}
+details.geweest:not(.jaar) .kaart{opacity:.75}
+h2.jaarkop{font-size:1.15rem;margin:14px 4px 0;color:var(--accent)}
+details.jaar>summary{font-size:1.15rem;color:var(--accent);padding:14px 4px 6px}

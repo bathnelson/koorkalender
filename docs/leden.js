@@ -94,21 +94,19 @@ function lijst() {
     class: soortKlasse(s), 'aria-pressed': FILTER.has(s) ? 'true' : 'false',
     onclick: () => { FILTER.has(s) ? FILTER.delete(s) : FILTER.add(s); teken(); }
   }, s)));
-  const inJaar = ITEMS.filter(i => FILTER.has(i.soort) && (i.datum.startsWith(JAAR) || eind(i).startsWith(JAAR)));
-  const delen = [filters, ...maandLijst(inJaar, it => itemRij(it), JAAR)];
+  const inJaar = ITEMS.filter(i => FILTER.has(i.soort));
+  const delen = [filters, ...maandLijst(inJaar, it => itemRij(it))];
   if (!inJaar.length) delen.push(el('p', {class: 'leeg'}, 'Geen activiteiten gevonden.'));
   return delen;
 }
 
 function teken() {
   for (const t of ['binnenkort', 'maand', 'jaar', 'lijst']) document.getElementById('tab-' + t).setAttribute('aria-selected', String(t === TAB));
-  document.getElementById('jaarkeuze').classList.toggle('verborgen', TAB !== 'lijst');
   inhoud.replaceChildren(...[].concat(TAB === 'binnenkort' ? binnenkort() : TAB === 'maand' ? maand() : TAB === 'jaar' ? jaar() : lijst()).filter(Boolean));
   try { localStorage.setItem('kk-tab', TAB); } catch (e) {}
 }
 
 for (const t of ['binnenkort', 'maand', 'jaar', 'lijst']) document.getElementById('tab-' + t).onclick = () => { TAB = t; GEKOZEN = null; teken(); };
-document.getElementById('jaarkeuze').onchange = e => { JAAR = Number(e.target.value); GEKOZEN = null; teken(); };
 try { TAB = localStorage.getItem('kk-tab') || TAB; } catch (e) {}
 
 
@@ -133,8 +131,6 @@ function start() {
   NAAM_KOOR = d.naam || '';
   if (d.ics) zetAbonnement(d.ics);
   if (d.naam) { document.getElementById('naam').textContent = 'Jaarplanning ' + d.naam; document.title = 'Jaarplanning ' + d.naam; }
-  const sel = document.getElementById('jaarkeuze');
-  sel.replaceChildren(...jarenVan(ITEMS).map(j => el('option', {value: j, selected: j === JAAR}, String(j))));
   teken();
 }).catch(e => e.afgeschermd ? vraagLedencode(inhoud, start) : inhoud.replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden. Probeer het later opnieuw.')));
 }
