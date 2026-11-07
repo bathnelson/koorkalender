@@ -109,3 +109,20 @@ function vraagLedencode(doel, verder) {
   doel.replaceChildren(form);
   invoer.focus();
 }
+
+// Lijst per maand; wat al voorbij is komt in een ingeklapt blok "Geweest" bovenaan
+function maandLijst(items, rij, jaar) {
+  const blokken = lijst => {
+    const uit = []; let maand = null, kaart = null;
+    for (const it of lijst) {
+      const d = naarDatum(it.datum), mk = it.datum.slice(0, 7);
+      if (mk !== maand) { maand = mk; uit.push(el('h2', {class: 'maand'}, MAANDEN[d.getMonth()] + (d.getFullYear() !== jaar ? ' ' + d.getFullYear() : ''))); kaart = el('div', {class: 'kaart'}); uit.push(kaart); }
+      kaart.append(rij(it));
+    }
+    return uit;
+  };
+  const nu = vandaagIso(), geweest = items.filter(i => eind(i) < nu), komend = items.filter(i => eind(i) >= nu);
+  const delen = [];
+  if (geweest.length) delen.push(el('details', {class: 'geweest'}, el('summary', {}, 'Geweest (' + geweest.length + ')'), blokken(geweest)));
+  return delen.concat(blokken(komend));
+}

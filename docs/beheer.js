@@ -24,17 +24,13 @@ function tekenLijst() {
   const sel = $('jaarkeuze');
   sel.replaceChildren(...jarenVan(ITEMS).map(j => el('option', {value: j, selected: j === JAAR}, String(j))));
   const inJaar = ITEMS.filter(i => i.datum.startsWith(JAAR) || eind(i).startsWith(JAAR));
-  const delen = [];
-  let maand = null, kaart = null;
-  for (const it of inJaar) {
-    const m = it.datum.slice(0, 7);
-    if (m !== maand) { maand = m; const d = naarDatum(it.datum); delen.push(el('h2', {class: 'maand'}, MAANDEN[d.getMonth()] + ' ' + d.getFullYear())); kaart = el('div', {class: 'kaart'}); delen.push(kaart); }
+  const delen = maandLijst(inJaar, it => {
     const rij = itemRij(it, el('div', {class: 'acties'},
       el('button', {onclick: () => bewerk(it), 'aria-label': 'Wijzig ' + it.titel + ' ' + kort(it.datum)}, 'Wijzig'),
       el('button', {class: 'gevaar', onclick: () => weg(it), 'aria-label': 'Verwijder ' + it.titel + ' ' + kort(it.datum)}, 'Verwijder')));
     if (vervalt(it, ITEMS)) { rij.classList.add('voorbij'); rij.querySelector('.titel').append(' (vervalt: vakantie)'); }
-    kaart.append(rij);
-  }
+    return rij;
+  }, JAAR);
   if (!inJaar.length) delen.push(el('p', {class: 'leeg'}, 'Nog niets gepland in ' + JAAR + '. Begin met "Wekelijkse repetities".'));
   $('lijst').replaceChildren(...delen);
 }

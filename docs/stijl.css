@@ -108,4 +108,7 @@ dialog h2{margin:0 0 12px;font-size:1.2rem}
 .groot .nr{font-size:.8rem;font-weight:600}
 .groot .chipje{display:block;font-size:.62rem;line-height:1.25;border-radius:4px;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tekst)}
 @media (min-width:700px){.groot td button{min-height:90px}.groot .chipje{font-size:.75rem}.groot .nr{font-size:.9rem}}
-@media (max-width:520px){header.kop h1{flex:1 1 100%}.ikonen{margin-left:0;width:100%;justify-content:flex-end}}
+@media (max-width:520px){header.kop h1{flex:1 1 100%}}
+details.geweest{margin:4px 0 8px}
+details.geweest>summary{cursor:pointer;color:var(--zacht);font-weight:600;padding:8px 4px}
+details.geweest .kaart{opacity:.75}

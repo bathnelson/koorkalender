@@ -95,13 +95,7 @@ function lijst() {
     onclick: () => { FILTER.has(s) ? FILTER.delete(s) : FILTER.add(s); teken(); }
   }, s)));
   const inJaar = ITEMS.filter(i => FILTER.has(i.soort) && (i.datum.startsWith(JAAR) || eind(i).startsWith(JAAR)));
-  const delen = [filters];
-  let maand = null, kaart = null;
-  for (const it of inJaar) {
-    const m = naarDatum(it.datum).getMonth() + (naarDatum(it.datum).getFullYear() < JAAR ? -12 : 0);
-    if (m !== maand) { maand = m; delen.push(el('h2', {class: 'maand'}, MAANDEN[(m + 12) % 12])); kaart = el('div', {class: 'kaart'}); delen.push(kaart); }
-    kaart.append(itemRij(it));
-  }
+  const delen = [filters, ...maandLijst(inJaar, it => itemRij(it), JAAR)];
   if (!inJaar.length) delen.push(el('p', {class: 'leeg'}, 'Geen activiteiten gevonden.'));
   return delen;
 }
