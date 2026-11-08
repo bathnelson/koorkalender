@@ -43,6 +43,10 @@ return [
     // Leeg laten voor geen voorvoegsel.
     'ics_voorvoegsel' => '',
 
+    // Map voor de planning en reservekopieën. Leeg = de map data/ naast api.php.
+    // Veiliger: een map buiten de webroot, bijv. '/home/gebruiker/kalender-data'. De webserver moet erin kunnen schrijven.
+    'data_map' => '',
+
     // Tijdzone voor het agenda-abonnement
     'tijdzone' => 'Europe/Amsterdam',
 ];

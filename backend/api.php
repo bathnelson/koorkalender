@@ -1,11 +1,46 @@
 <?php
 declare(strict_types=1);
 
-$CONFIG = require __DIR__ . '/config.php';
-const DATA_DIR = __DIR__ . '/data';
+// Algemene veiligheidskoppen voor elk antwoord
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: no-referrer');
+header('X-Frame-Options: DENY');
+header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+
+// ---------- welke vereniging? ----------
+// Eén vereniging: config.php naast api.php.
+// Meerdere verenigingen met dezelfde code: een map verenigingen/ met per vereniging <naam>.php
+// (bijv. verenigingen/koor.php). De naam komt uit het eerste deel van het webadres (koor.mijndomein.nl -> koor),
+// of uit verenigingen/domeinen.php (['mijndomein.nl' => 'koor', ...]) voor adressen die daar niet op passen.
+function kiesVereniging(): array {
+    $map = __DIR__ . '/verenigingen';
+    if (!is_dir($map)) {
+        if (!is_file(__DIR__ . '/config.php')) { http_response_code(500); exit('config.php ontbreekt.'); }
+        return ['', require __DIR__ . '/config.php'];
+    }
+    $host = strtolower(preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')));
+    $domeinen = is_file($map . '/domeinen.php') ? (require $map . '/domeinen.php') : [];
+    $id = is_array($domeinen) && isset($domeinen[$host]) ? (string)$domeinen[$host] : explode('.', $host)[0];
+    // Alleen kleine letters, cijfers en streepjes: zo kan een webadres nooit naar een ander bestand wijzen
+    if (!preg_match('/^[a-z0-9][a-z0-9-]{0,39}$/', $id) || $id === 'domeinen' || !is_file($map . '/' . $id . '.php')) {
+        http_response_code(404); header('Content-Type: text/plain; charset=utf-8'); exit('Onbekende vereniging.');
+    }
+    return [$id, require $map . '/' . $id . '.php'];
+}
+[$VERENIGING, $CONFIG] = kiesVereniging();
+if (!is_array($CONFIG)) { http_response_code(500); exit('Ongeldige instellingen.'); }
+
+// Map voor de gegevens: 'data_map' in de instellingen (bij voorkeur buiten de webroot), anders data/ of data/<vereniging>/
+function dataMap(array $cfg, string $id): string {
+    $m = trim((string)($cfg['data_map'] ?? ''));
+    if ($m === '') return __DIR__ . '/data' . ($id !== '' ? '/' . $id : '');
+    return rtrim($m[0] === '/' || preg_match('/^[A-Za-z]:[\\\/]/', $m) ? $m : __DIR__ . '/' . $m, '/\\');
+}
+define('DATA_DIR', dataMap($CONFIG, $VERENIGING));
 const DATA_FILE = DATA_DIR . '/planning.json';
 const BACKUP_DIR = DATA_DIR . '/backup';
 const MAX_BACKUPS = 50;
+const MAX_INVOER = 256 * 1024;
 
 // ---------- soorten activiteiten ----------
 // Standaard de soorten van een koor; een andere vereniging zet eigen soorten in config.php ('soorten').
@@ -49,11 +84,28 @@ if (is_string($herkomst) && $herkomst !== '' && in_array(rtrim($herkomst, '/'), 
 header('Vary: Origin');
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }
 
+// Beperkt pogingen (inloggen, ledencode): hooguit 10 mislukte pogingen per kwartier per IP-adres
+function pogingenBestand(): string { return DATA_DIR . '/.pogingen.json'; }
+function teVeelPogingen(string $soort): bool {
+    $p = @json_decode((string)@file_get_contents(pogingenBestand()), true) ?: [];
+    $k = $soort . '|' . ($_SERVER['REMOTE_ADDR'] ?? '');
+    $recent = array_filter($p[$k] ?? [], function ($t) { return $t > time() - 900; });
+    return count($recent) >= 10;
+}
+function mislukt(string $soort): void {
+    if (!is_dir(DATA_DIR)) @mkdir(DATA_DIR, 0775, true);
+    $f = pogingenBestand();
+    $p = @json_decode((string)@file_get_contents($f), true) ?: [];
+    foreach ($p as $k => $ts) { $p[$k] = array_values(array_filter($ts, function ($t) { return $t > time() - 900; })); if (!$p[$k]) unset($p[$k]); }
+    $p[$soort . '|' . ($_SERVER['REMOTE_ADDR'] ?? '')][] = time();
+    @file_put_contents($f, json_encode($p), LOCK_EX);
+}
 function antwoord($data, int $status = 200): void {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    // HEX-opties: ook als iemand dit antwoord als HTML zou laten tonen, staat er geen uitvoerbare opmaak in
+    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     exit;
 }
 function fout(string $melding, int $status = 400): void { antwoord(['fout' => $melding], $status); }
@@ -402,16 +454,20 @@ if ($methode === 'GET' && $actie === 'sessie') {
 }
 if ($methode !== 'POST') fout('Onbekende actie.', 404);
 
-$invoer = json_decode((string)file_get_contents('php://input'), true);
+if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0) > MAX_INVOER) fout('Te veel gegevens in één keer.', 413);
+$ruw = (string)file_get_contents('php://input', false, null, 0, MAX_INVOER + 1);
+if (strlen($ruw) > MAX_INVOER) fout('Te veel gegevens in één keer.', 413);
+$invoer = json_decode($ruw, true);
 if (!is_array($invoer)) $invoer = [];
 
 switch ($actie) {
     case 'login':
+        if (teVeelPogingen('login')) fout('Te veel mislukte pogingen. Probeer het over een kwartier opnieuw.', 429);
         $ww = (string)($CONFIG['wachtwoord'] ?? '');
         if ($ww === '' || $ww === 'verander-mij') fout('Er is nog geen wachtwoord ingesteld in config.php.', 403);
         $gegeven = is_string($invoer['wachtwoord'] ?? null) ? $invoer['wachtwoord'] : '';
         $ok = strpos($ww, '$2y$') === 0 ? password_verify($gegeven, $ww) : hash_equals($ww, $gegeven);
-        if (!$ok) { sleep(2); fout('Wachtwoord klopt niet.', 401); }
+        if (!$ok) { mislukt('login'); sleep(2); fout('Wachtwoord klopt niet.', 401); }
         antwoord(['ingelogd' => true, 'token' => maakToken($CONFIG)]);
     case 'opslaan':
         vereisBeheer();
@@ -443,8 +499,9 @@ switch ($actie) {
         antwoord(['ok' => true, 'items' => $data['items']]);
     case 'ledencode':
         if (!ledenAfgeschermd($CONFIG)) antwoord(['sleutel' => '']);
+        if (teVeelPogingen('code')) fout('Te veel mislukte pogingen. Probeer het over een kwartier opnieuw.', 429);
         $code = is_string($invoer['code'] ?? null) ? trim($invoer['code']) : '';
-        if (!hash_equals(strtolower(trim((string)$CONFIG['leden_code'])), strtolower($code))) { sleep(2); fout('Die code klopt niet.', 401); }
+        if (!hash_equals(strtolower(trim((string)$CONFIG['leden_code'])), strtolower($code))) { mislukt('code'); sleep(2); fout('Die code klopt niet.', 401); }
         antwoord(['sleutel' => ledenSleutel()]);
     case 'leden_link':
         vereisBeheer();

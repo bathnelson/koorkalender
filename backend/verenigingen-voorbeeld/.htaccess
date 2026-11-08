@@ -1,0 +1,3 @@
+# Instellingen van de verenigingen nooit via het web tonen
+Require all denied
+Deny from all
