@@ -31,12 +31,12 @@ function tekenLijst() {
     if (vervalt(it, ITEMS)) { rij.classList.add('voorbij'); rij.querySelector('.titel').append(' (vervalt: vakantie)'); }
     return rij;
   }, JAAR);
-  if (!inJaar.length) delen.push(el('p', {class: 'leeg'}, 'Nog niets gepland in ' + JAAR + '. Begin met "Wekelijkse repetities".'));
+  if (!inJaar.length) delen.push(el('p', {class: 'leeg'}, 'Nog niets gepland in ' + JAAR + '.' + (metRol('wekelijks') ? ' Begin met "Wekelijkse ' + meervoud(WEKELIJKS()) + '".' : '')));
   $('lijst').replaceChildren(...delen);
 }
 
 function bewerk(it) {
-  it = it || {id: '', titel: '', soort: 'Optreden', datum: '', tm: '', tijd: '', waar: '', opmerking: ''};
+  it = it || {id: '', titel: '', soort: metRol('hoogtepunt') || SOORTEN[0], datum: '', tm: '', tijd: '', waar: '', opmerking: ''};
   $('dlgtitel').textContent = it.id ? 'Activiteit wijzigen' : 'Nieuwe activiteit';
   $('f-id').value = it.id; $('f-titel').value = it.titel; $('f-soort').value = it.soort; $('f-datum').value = it.datum;
   $('f-tm').value = it.tm; $('f-tijd').value = it.tijd; $('f-waar').value = it.waar; $('f-opm').value = it.opmerking || ''; $('f-liedjes').value = it.liedjes || ''; toonLiedjesVeld();
@@ -58,7 +58,7 @@ $('form').addEventListener('submit', async e => {
   catch (err) { fout('dlgfout', err.message); }
 });
 // Het programma-veld alleen bij optredens tonen (of als er al liedjes in staan)
-function toonLiedjesVeld() { $('v-liedjes').classList.toggle('verborgen', !['Optreden', 'Onder voorbehoud'].includes($('f-soort').value) && !$('f-liedjes').value.trim()); }
+function toonLiedjesVeld() { $('v-liedjes').classList.toggle('verborgen', !(PROGRAMMA && (isRol($('f-soort').value, 'hoogtepunt') || isRol($('f-soort').value, 'voorbehoud'))) && !$('f-liedjes').value.trim()); }
 $('f-soort').addEventListener('change', toonLiedjesVeld);
 $('f-annuleer').onclick = () => $('dlg').close();
 $('nieuw').onclick = () => bewerk(null);
@@ -71,19 +71,19 @@ function reeksDatums() {
   for (let d = naarDatum(van); naarIso(d) <= tot; d.setDate(d.getDate() + 1)) {
     if (d.getDay() !== dag) continue;
     const iso = naarIso(d);
-    if (slaOver && opDag(ITEMS, iso).some(i => i.soort === 'Repetitie' && i.datum === iso)) continue;
+    if (slaOver && opDag(ITEMS, iso).some(i => isRol(i.soort, 'wekelijks') && i.datum === iso)) continue;
     uit.push(iso);
   }
   return uit;
 }
-function preview() { const n = reeksDatums().length; $('r-preview').textContent = n ? n + ' repetities worden toegevoegd.' : 'Kies een periode.'; $('r-ok').disabled = !n || n > 200; }
+function preview() { const n = reeksDatums().length; $('r-preview').textContent = n ? n + ' ' + meervoud(WEKELIJKS()) + ' worden toegevoegd.' : 'Kies een periode.'; $('r-ok').disabled = !n || n > 200; }
 ['r-dag', 'r-van', 'r-tot', 'r-vak'].forEach(id => $(id).addEventListener('input', preview));
 $('reeks').onclick = () => { $('r-van').value = JAAR + '-01-01'; $('r-tot').value = JAAR + '-12-31'; fout('dlg2fout'); preview(); $('dlg2').showModal(); };
 $('r-annuleer').onclick = () => $('dlg2').close();
 $('form2').addEventListener('submit', async e => {
   e.preventDefault();
-  const items = reeksDatums().map(datum => ({datum, tm: '', tijd: $('r-tijd').value, titel: $('r-titel').value || 'Repetitie', soort: 'Repetitie', waar: $('r-waar').value, opmerking: ''}));
-  try { const d = await api('meerdere', {items}); ITEMS = d.items; tekenLijst(); $('dlg2').close(); zeg(d.aantal + ' repetities toegevoegd.'); }
+  const items = reeksDatums().map(datum => ({datum, tm: '', tijd: $('r-tijd').value, titel: $('r-titel').value || metRol('wekelijks'), soort: metRol('wekelijks'), waar: $('r-waar').value, opmerking: ''}));
+  try { const d = await api('meerdere', {items}); ITEMS = d.items; tekenLijst(); $('dlg2').close(); zeg(d.aantal + ' ' + meervoud(WEKELIJKS()) + ' toegevoegd.'); }
   catch (err) { fout('dlg2fout', err.message); }
 });
 
@@ -94,10 +94,20 @@ $('loginform').addEventListener('submit', async e => {
   catch (err) { fout('loginfout', err.message); }
 });
 $('uit').onclick = () => { zetToken(''); toon(false); };
-$('f-soort').replaceChildren(...SOORTEN.map(s => el('option', {value: s}, s)));
+function zetSoortKeuzes() {
+  $('f-soort').replaceChildren(...SOORTEN.map(s => el('option', {value: s}, s)));
+  const w = metRol('wekelijks'), mv = meervoud(WEKELIJKS());
+  $('reeks').classList.toggle('verborgen', !w);
+  $('reeks').textContent = '+ Wekelijkse ' + mv;
+  $('reekskop').textContent = 'Wekelijkse ' + mv + ' toevoegen';
+  $('r-titel').value = w;
+  $('r-vaktekst').textContent = ' Sla dagen met al een ' + WEKELIJKS() + ' over (in vakanties vervalt de ' + WEKELIJKS() + ' sowieso)';
+  $('vakknop').classList.toggle('verborgen', !metRol('vakantie'));
+}
+zetSoortKeuzes();
 
 async function laad() {
-  ITEMS = (await api('lijst')).items || []; tekenLijst();
+  const lijstData = await api('lijst'); zetSoorten(lijstData.soorten, lijstData.programma); zetSoortKeuzes(); ITEMS = lijstData.items || []; tekenLijst();
   api('leden_link', {}).then(toonLeden).catch(e => zeg('Ledenlink ophalen lukte niet: ' + e.message));
   api('ics_link', {}).then(d => toonIcs(d.sleutel)).catch(e => fout('icsfout', 'Agendalink maken lukte niet: ' + e.message));
   // Schoolvakanties van dit en volgend schooljaar automatisch ophalen (eenmalig per schooljaar)

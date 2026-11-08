@@ -21,6 +21,12 @@ De pagina's en `api.php` staan op hetzelfde domein, dus er is geen extra instell
 - **De app aanpassen**: wijzig de bestanden in `docs/` en push naar `main`. GitHub Pages publiceert het binnen een paar minuten (de cache kan tot 10 minuten duren).
 - **De host hoef je alleen aan te raken als `api.php` verandert.** De html op de host blijft altijd gelijk.
 
+## Andere vereniging
+
+Standaard gebruikt de kalender de soorten van een koor (Repetitie, Optreden, …). Een andere vereniging zet eigen soorten in `config.php` onder `'soorten'`, met per soort een naam, een kleur en eventueel een rol (`wekelijks`, `hoogtepunt`, `voorbehoud` of `vakantie`). Zie het voorbeeld in `config.php`. Met `'programma' => false` verdwijnt het programma-veld, met `'vakanties_importeren' => false` worden geen schoolvakanties opgehaald.
+
+Meerdere verenigingen kunnen dezelfde code van GitHub Pages gebruiken: zet per vereniging de inhoud van `backend/` in een eigen map of subdomein, met een eigen `config.php` en `data/`.
+
 ## Afschermen voor leden
 
 Vul in `config.php` een `leden_code` in. De kalender is dan alleen te zien voor wie via de geheime ledenlink komt (te vinden op de beheerpagina, onder "Ledenlink") of die code één keer intypt. De browser onthoudt dat. Het agenda-abonnement werkt met een eigen geheime link en blijft gewoon werken.

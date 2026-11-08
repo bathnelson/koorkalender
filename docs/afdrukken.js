@@ -1,3 +1,4 @@
+document.documentElement.classList.add('licht'); // afdrukpagina is altijd licht
 let ALLES = [], NAAM = '';
 const $ = id => document.getElementById(id);
 
@@ -13,7 +14,7 @@ function maandTabel(J, m, items) {
   for (let k = 0; k < start; k++) rij.append(el('td', {class: 'leegvak'}));
   for (let d = 1; d <= dagen; d++) {
     const iso = naarIso(new Date(J, m, d)), s = hoofdSoort(opDag(items, iso));
-    rij.append(el('td', {class: (s ? soortKlasse(s) : '') + (s && s !== 'Vakantie' ? ' heeft' : '')}, String(d)));
+    rij.append(el('td', {class: (s ? soortKlasse(s) : '') + (s && !isRol(s, 'vakantie') ? ' heeft' : '')}, String(d)));
     if ((start + d) % 7 === 0) { tbody.append(rij); rij = el('tr'); }
   }
   if (rij.children.length) { while (rij.children.length < 7) rij.append(el('td', {class: 'leegvak'})); tbody.append(rij); }
@@ -23,13 +24,13 @@ function maandTabel(J, m, items) {
 
 // Meest voorkomende tijd/plaats van de gewone repetities, voor één regel onder het overzicht
 function vasteRepetitie(items) {
-  const reps = items.filter(i => i.soort === 'Repetitie');
+  const reps = items.filter(i => isRol(i.soort, 'wekelijks'));
   if (!reps.length) return null;
   const tel = {};
   for (const r of reps) { const k = DAGEN[naarDatum(r.datum).getDay()] + '|' + r.tijd + '|' + r.waar; tel[k] = (tel[k] || 0) + 1; }
   const [dag, tijd, waar] = Object.entries(tel).sort((a, b) => b[1] - a[1])[0][0].split('|');
   const naam = {ma:'maandag',di:'dinsdag',wo:'woensdag',do:'donderdag',vr:'vrijdag',za:'zaterdag',zo:'zondag'}[dag];
-  return 'Gewone repetities: ' + naam + 'avond' + (tijd ? ' ' + tijd.replace('-', '–') + ' uur' : '') + (waar ? ', ' + waar : '') + '. In vakanties is er geen repetitie.';
+  return 'Gewone ' + meervoud(WEKELIJKS()) + ': ' + naam + 'avond' + (tijd ? ' ' + tijd.replace('-', '–') + ' uur' : '') + (waar ? ', ' + waar : '') + '. In vakanties is er geen ' + WEKELIJKS() + '.';
 }
 
 function gekozen() {
@@ -44,13 +45,14 @@ function gekozen() {
 // Klassiek raster: dagen 1-31 onder elkaar, maanden naast elkaar, zoals de oude Excel
 function rasterCel(items, d) {
   const iso = naarIso(d), lijst = opDag(items, iso);
-  const tekst = lijst.filter(i => i.soort !== 'Vakantie' || i.datum === iso)
-    .map(i => (i.soort === 'Vakantie' && i.tm ? i.titel + ' (t/m ' + kort(i.tm) + ')' : i.titel) + (i.tijd && i.soort !== 'Repetitie' ? ' ' + i.tijd : '')).join(' / ');
+  const tekst = lijst.filter(i => !isRol(i.soort, 'vakantie') || i.datum === iso)
+    .map(i => (isRol(i.soort, 'vakantie') && i.tm ? i.titel + ' (t/m ' + kort(i.tm) + ')' : i.titel) + (i.tijd && !isRol(i.soort, 'wekelijks') ? ' ' + i.tijd : '')).join(' / ');
   return {soort: hoofdSoort(lijst), tekst, dag: DAGEN[d.getDay()]};
 }
 function aantalRepetities(items, d) {
   const m = d.getMonth(), j = d.getFullYear();
-  return items.filter(i => i.soort === 'Repetitie' || i.soort === 'Extra repetitie').filter(i => { const x = naarDatum(i.datum); return x.getMonth() === m && x.getFullYear() === j; }).length;
+  const w = WEKELIJKS();
+  return items.filter(i => isRol(i.soort, 'wekelijks') || i.soort.toLowerCase().includes(w)).filter(i => { const x = naarDatum(i.datum); return x.getMonth() === m && x.getFullYear() === j; }).length;
 }
 function tekenKlassiek() {
   const {items, sub, maanden, titel} = gekozen();
@@ -64,13 +66,13 @@ function tekenKlassiek() {
       return el('td', {class: (c.soort ? soortKlasse(c.soort) : '') + (weekend ? ' weekend' : '')}, el('div', {}, el('span', {class: 'wd'}, c.dag), ' ', c.tekst));
     })));
   }
-  tbody.append(el('tr', {class: 'telling'}, el('th', {title: 'Aantal repetities'}, '#'), maanden.map(m => el('td', {}, String(aantalRepetities(items, m))))));
-  const blad = el('section', {class: 'blad klassiek-blad'}, el('h1', {}, titel), el('p', {class: 'sub'}, sub + ' · onderste regel: aantal repetities per maand'),
+  tbody.append(el('tr', {class: 'telling'}, el('th', {title: 'Aantal ' + meervoud(WEKELIJKS())}, '#'), maanden.map(m => el('td', {}, String(aantalRepetities(items, m))))));
+  const blad = el('section', {class: 'blad klassiek-blad'}, el('h1', {}, titel), el('p', {class: 'sub'}, sub + ' · onderste regel: aantal ' + meervoud(WEKELIJKS()) + ' per maand'),
     el('table', {class: 'klassiek'}, el('thead', {}, kop), tbody), legenda(), vasteRepetitie(items) ? el('p', {class: 'vast'}, vasteRepetitie(items)) : null);
   $('bladen').replaceChildren(blad);
 }
 
-const ARGB = {'Repetitie':'FFCFE0F3','Extra repetitie':'FF8FD3CF','Optreden':'FFF4A6A0','Onder voorbehoud':'FFFFE45C','Vergadering':'FFC9B8E0','Vakantie':'FFB7DD9A','Overig':'FFF8CBAD'};
+const argb = s => 'FF' + (KLEUR[s] || '#ffffff').slice(1).toUpperCase();
 function laadScript(src) { return new Promise((ok, fout) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => fout(new Error('kon ' + src + ' niet laden')); document.head.append(s); }); }
 async function downloadExcel() {
   const knop = $('excel'); knop.disabled = true; knop.textContent = 'Bezig…';
@@ -92,20 +94,20 @@ async function downloadExcel() {
         if (d.getMonth() !== m.getMonth()) { c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: 'FFE5E5E5'}}; return; }
         const x = rasterCel(items, d);
         c.value = x.dag + (x.tekst ? ' ' + x.tekst : '');
-        if (x.soort) c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: ARGB[x.soort]}};
+        if (x.soort) c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: argb(x.soort)}};
       });
     }
     const rt = 35; ws.getCell(rt, 1).value = '#'; ws.getCell(rt, 1).font = {bold: true};
     maanden.forEach((m, n) => { const c = ws.getCell(rt, n + 2); c.value = aantalRepetities(items, m); c.alignment = {horizontal: 'center'}; c.font = {bold: true}; });
-    ws.getCell(rt, 14).value = 'aantal repetities';
-    SOORTEN.forEach((s, k) => { const c = ws.getCell(37 + k, 2); c.value = LABEL[s] || s; c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: ARGB[s]}}; c.border = randen; ws.mergeCells(37 + k, 2, 37 + k, 3); });
+    ws.getCell(rt, 14).value = 'aantal ' + meervoud(WEKELIJKS());
+    SOORTEN.forEach((s, k) => { const c = ws.getCell(37 + k, 2); c.value = LABEL[s] || s; c.fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: argb(s)}}; c.border = randen; ws.mergeCells(37 + k, 2, 37 + k, 3); });
 
     const wl = wb.addWorksheet('Lijst', {views: [{state: 'frozen', ySplit: 1}]});
     wl.columns = [{header: 'Datum', key: 'd', width: 14}, {header: 't/m', key: 'tm', width: 14}, {header: 'Tijd', key: 't', width: 13}, {header: 'Activiteit', key: 'a', width: 36}, {header: 'Soort', key: 's', width: 18}, {header: 'Waar', key: 'w', width: 30}, {header: 'Opmerking', key: 'o', width: 30}];
     wl.getRow(1).font = {bold: true};
     for (const i of items) {
       const rij = wl.addRow({d: naarDatum(i.datum), tm: i.tm ? naarDatum(i.tm) : null, t: i.tijd, a: i.titel, s: i.soort, w: i.waar, o: i.opmerking});
-      rij.getCell('s').fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: ARGB[i.soort] || 'FFFFFFFF'}};
+      rij.getCell('s').fill = {type: 'pattern', pattern: 'solid', fgColor: {argb: argb(i.soort)}};
     }
     wl.getColumn('d').numFmt = 'ddd d mmm yyyy'; wl.getColumn('tm').numFmt = 'ddd d mmm yyyy';
     wl.autoFilter = {from: 'A1', to: 'G1'};
@@ -131,7 +133,7 @@ function teken() {
   const vast = vasteRepetitie(items);
   const blad1 = el('section', {class: 'blad'}, el('h1', {}, titel), el('p', {class: 'sub'}, sub), raster, legenda(), vast ? el('p', {class: 'vast'}, vast) : null);
 
-  const lijst = items.filter(i => i.soort !== 'Repetitie');
+  const lijst = items.filter(i => !isRol(i.soort, 'wekelijks'));
   const tbody = el('tbody'); let maand = null;
   for (const it of lijst) {
     const d = naarDatum(it.datum), mk = d.getFullYear() * 12 + d.getMonth();
@@ -141,10 +143,10 @@ function teken() {
       el('td', {class: 'kleur ' + soortKlasse(it.soort)}),
       el('td', {class: 'nowrap'}, wanneer),
       el('td', {class: 'nowrap'}, it.tijd ? it.tijd.replace('-', '–') : ''),
-      el('td', {}, el('b', {}, it.titel), it.soort === 'Onder voorbehoud' ? ' (onder voorbehoud)' : ''),
+      el('td', {}, el('b', {}, it.titel), isRol(it.soort, 'voorbehoud') ? ' (' + it.soort.toLowerCase() + ')' : ''),
       el('td', {}, [it.waar, it.opmerking].filter(Boolean).join(' · '))));
   }
-  const blad2 = el('section', {class: 'blad'}, el('h1', {}, 'Activiteiten'), el('p', {class: 'sub'}, sub + ' · wekelijkse repetities staan alleen in het jaaroverzicht'),
+  const blad2 = el('section', {class: 'blad'}, el('h1', {}, 'Activiteiten'), el('p', {class: 'sub'}, sub + ' · wekelijkse ' + meervoud(WEKELIJKS()) + ' staan alleen in het jaaroverzicht'),
     lijst.length ? el('table', {class: 'lijst'}, el('thead', {}, el('tr', {}, el('th', {}), el('th', {}, 'Wanneer'), el('th', {}, 'Tijd'), el('th', {}, 'Wat'), el('th', {}, 'Waar / opmerking'))), tbody)
                  : el('p', {}, 'Geen activiteiten in deze periode.'));
   $('bladen').replaceChildren(blad1, blad2);

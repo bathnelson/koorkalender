@@ -69,7 +69,7 @@
 
 <dialog id="dlg2">
   <form id="form2" method="dialog">
-    <h2>Wekelijkse repetities toevoegen</h2>
+    <h2 id="reekskop">Wekelijkse repetities toevoegen</h2>
     <div class="rij">
       <div class="veld"><label for="r-dag">Dag</label><select id="r-dag"><option value="1">maandag</option><option value="2">dinsdag</option><option value="3" selected>woensdag</option><option value="4">donderdag</option><option value="5">vrijdag</option><option value="6">zaterdag</option><option value="0">zondag</option></select></div>
       <div class="veld"><label for="r-tijd">Tijd <small>(mag leeg)</small></label><input id="r-tijd" maxlength="20" placeholder="19:30-22:00"></div>
@@ -82,7 +82,7 @@
       <div class="veld"><label for="r-titel">Naam</label><input id="r-titel" value="Repetitie" maxlength="120"></div>
       <div class="veld"><label for="r-waar">Waar</label><input id="r-waar" maxlength="120"></div>
     </div>
-    <div class="veld"><label><input type="checkbox" id="r-vak" checked style="width:auto;min-height:0"> Sla dagen met al een repetitie over (in vakanties vervalt de repetitie sowieso)</label></div>
+    <div class="veld"><label><input type="checkbox" id="r-vak" checked style="width:auto;min-height:0"><span id="r-vaktekst"> Sla dagen met al een repetitie over (in vakanties vervalt de repetitie sowieso)</span></label></div>
     <p id="r-preview" class="meta"></p>
     <p id="dlg2fout" class="melding verborgen"></p>
     <div class="knoppen">

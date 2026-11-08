@@ -2,11 +2,39 @@
 declare(strict_types=1);
 
 $CONFIG = require __DIR__ . '/config.php';
-const SOORTEN = ['Repetitie', 'Extra repetitie', 'Optreden', 'Onder voorbehoud', 'Vergadering', 'Vakantie', 'Overig'];
 const DATA_DIR = __DIR__ . '/data';
 const DATA_FILE = DATA_DIR . '/planning.json';
 const BACKUP_DIR = DATA_DIR . '/backup';
 const MAX_BACKUPS = 50;
+
+// ---------- soorten activiteiten ----------
+// Standaard de soorten van een koor; een andere vereniging zet eigen soorten in config.php ('soorten').
+// Rollen: wekelijks (vervalt in vakanties, standaard niet in de lijst), hoogtepunt (eerstvolgende, programma),
+// voorbehoud (nog niet zeker), vakantie (schoolvakanties). Andere soorten hebben geen rol.
+function soortDefs(): array {
+    global $CONFIG;
+    static $defs = null;
+    if ($defs !== null) return $defs;
+    $std = [['naam' => 'Repetitie', 'kleur' => '#cfe0f3', 'rol' => 'wekelijks'], ['naam' => 'Extra repetitie', 'kleur' => '#8fd3cf', 'rol' => ''],
+        ['naam' => 'Optreden', 'kleur' => '#f4a6a0', 'rol' => 'hoogtepunt'], ['naam' => 'Onder voorbehoud', 'kleur' => '#ffe45c', 'rol' => 'voorbehoud'],
+        ['naam' => 'Vergadering', 'kleur' => '#c9b8e0', 'rol' => ''], ['naam' => 'Vakantie', 'kleur' => '#b7dd9a', 'rol' => 'vakantie'], ['naam' => 'Overig', 'kleur' => '#f8cbad', 'rol' => '']];
+    $eigen = $CONFIG['soorten'] ?? null;
+    if (!is_array($eigen) || !$eigen) return $defs = $std;
+    $defs = [];
+    foreach ($eigen as $s) {
+        $naam = is_array($s) ? trim((string)($s['naam'] ?? '')) : '';
+        if ($naam === '') continue;
+        $kleur = (string)($s['kleur'] ?? '');
+        $rol = (string)($s['rol'] ?? '');
+        $defs[] = ['naam' => mb_substr($naam, 0, 40), 'kleur' => preg_match('/^#[0-9a-f]{6}$/i', $kleur) ? $kleur : '#dddddd',
+            'rol' => in_array($rol, ['wekelijks', 'hoogtepunt', 'voorbehoud', 'vakantie'], true) ? $rol : '',
+            'meervoud' => mb_substr(trim((string)($s['meervoud'] ?? '')), 0, 40)];
+    }
+    return $defs ?: ($defs = $std);
+}
+function soortNamen(): array { return array_column(soortDefs(), 'naam'); }
+function soortRol(string $soort): string { foreach (soortDefs() as $d) if ($d['naam'] === $soort) return $d['rol']; return ''; }
+function soortMetRol(string $rol): string { foreach (soortDefs() as $d) if ($d['rol'] === $rol) return $d['naam']; return ''; }
 
 date_default_timezone_set($CONFIG['tijdzone'] ?? 'Europe/Amsterdam');
 
@@ -102,7 +130,7 @@ function schoonItem($in): array {
     if ($item['tm'] !== '' && (!geldigeDatum($item['tm']) || $item['tm'] < $item['datum'])) fout('De datum bij "t/m" moet na de begindatum liggen.');
     if ($item['tm'] === $item['datum']) $item['tm'] = '';
     if ($item['titel'] === '') fout('Vul in wat er gebeurt.');
-    if (!in_array($item['soort'], SOORTEN, true)) fout('Kies een soort.');
+    if (!in_array($item['soort'], soortNamen(), true)) fout('Kies een soort.');
     if ($item['tijd'] !== '' && !preg_match('/^([01]?\d|2[0-3])[:.]([0-5]\d)(\s*-\s*([01]?\d|2[0-3])[:.]([0-5]\d))?$/', $item['tijd'])) {
         fout('Schrijf de tijd als 19:30 of 19:30-21:30.');
     }
@@ -141,9 +169,9 @@ function vereisBeheer(): void {
 
 // ---------- repetities vervallen in vakanties ----------
 function zichtbareItems(array $items): array {
-    $vak = array_values(array_filter($items, function ($i) { return $i['soort'] === 'Vakantie'; }));
+    $vak = array_values(array_filter($items, function ($i) { return soortRol($i['soort']) === 'vakantie'; }));
     return array_values(array_filter($items, function ($i) use ($vak) {
-        if ($i['soort'] !== 'Repetitie') return true;
+        if (soortRol($i['soort']) !== 'wekelijks') return true;
         foreach ($vak as $v) {
             $eind = $v['tm'] !== '' ? $v['tm'] : $v['datum'];
             if ($i['datum'] >= $v['datum'] && $i['datum'] <= $eind) return false;
@@ -258,17 +286,20 @@ function importeerVakanties(array $schooljaren, array $cfg): array {
         $gelukt[] = $sj;
         foreach ($lijst as $v) $nieuw[] = $v;
     }
-    $data = wijzig(function ($d) use ($nieuw, $gelukt, &$toegevoegd, &$overgeslagen) {
+    $vakSoort = soortMetRol('vakantie');
+    $wekelijks = soortMetRol('wekelijks');
+    $vakOpm = 'schoolvakantie' . ($wekelijks !== '' ? ', geen ' . mb_strtolower($wekelijks) : '');
+    $data = wijzig(function ($d) use ($nieuw, $gelukt, $vakSoort, $vakOpm, &$toegevoegd, &$overgeslagen) {
         foreach ($nieuw as $v) {
             $botst = false;
             foreach ($d['items'] as $i) {
-                if ($i['soort'] !== 'Vakantie') continue;
+                if (soortRol($i['soort']) !== 'vakantie') continue;
                 $e = $i['tm'] !== '' ? $i['tm'] : $i['datum'];
                 if ($v['datum'] <= $e && $v['tm'] >= $i['datum']) { $botst = true; break; }
             }
             if ($botst) { $overgeslagen[] = $v['titel'] . ' ' . $v['datum']; continue; }
             $d['items'][] = ['id' => 'v' . bin2hex(random_bytes(5)), 'datum' => $v['datum'], 'tm' => $v['tm'] === $v['datum'] ? '' : $v['tm'],
-                'tijd' => '', 'titel' => $v['titel'], 'soort' => 'Vakantie', 'waar' => '', 'opmerking' => 'schoolvakantie, geen repetitie'];
+                'tijd' => '', 'titel' => $v['titel'], 'soort' => $vakSoort, 'waar' => '', 'opmerking' => $vakOpm];
             $toegevoegd[] = $v['titel'] . ' ' . $v['datum'];
         }
         $klaar = $d['instellingen']['vakanties_geimporteerd'] ?? [];
@@ -326,14 +357,14 @@ function ics(array $items, array $cfg): void {
             $r[] = 'DTEND;VALUE=DATE:' . date('Ymd', strtotime($tot . ' +1 day'));
             $r[] = 'TRANSP:TRANSPARENT';
         }
-        $titel = ($it['soort'] === 'Onder voorbehoud' ? 'Onder voorbehoud: ' : '') . $it['titel'];
+        $titel = (soortRol($it['soort']) === 'voorbehoud' ? $it['soort'] . ': ' : '') . $it['titel'];
         $voor = trim((string)($cfg['ics_voorvoegsel'] ?? ''));
         if ($voor !== '') $titel = "[$voor] " . $titel;
         $r[] = 'SUMMARY:' . icsTekst(zonderLinks($titel));
         $r[] = 'CATEGORIES:' . icsTekst($it['soort']);
         $kleur = ['Repetitie' => 'lightsteelblue', 'Extra repetitie' => 'mediumturquoise', 'Optreden' => 'salmon', 'Onder voorbehoud' => 'gold', 'Vergadering' => 'mediumpurple', 'Vakantie' => 'yellowgreen', 'Overig' => 'sandybrown'][$it['soort']] ?? '';
         if ($kleur !== '') $r[] = 'COLOR:' . $kleur; // RFC 7986: CSS-kleurnaam
-        $r[] = 'STATUS:' . ($it['soort'] === 'Onder voorbehoud' ? 'TENTATIVE' : 'CONFIRMED');
+        $r[] = 'STATUS:' . (soortRol($it['soort']) === 'voorbehoud' ? 'TENTATIVE' : 'CONFIRMED');
         if ($it['waar'] !== '') $r[] = 'LOCATION:' . icsTekst(zonderLinks($it['waar']));
         $omschr = $it['opmerking'];
         if (($it['liedjes'] ?? '') !== '') {
@@ -357,7 +388,7 @@ $methode = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($methode === 'GET' && $actie === 'lijst') {
     if (!magLijstZien($CONFIG)) antwoord(['fout' => 'Deze kalender is alleen voor leden.', 'afgeschermd' => true], 401);
-    antwoord(['naam' => $CONFIG['naam'] ?? '', 'soorten' => SOORTEN, 'items' => laad()['items'], 'ics' => icsSleutel()]);
+    antwoord(['naam' => $CONFIG['naam'] ?? '', 'soorten' => soortDefs(), 'programma' => ($CONFIG['programma'] ?? true) !== false, 'items' => laad()['items'], 'ics' => icsSleutel()]);
 }
 if ($methode === 'GET' && $actie === 'ics') {
     $sleutel = $_GET['sleutel'] ?? '';
@@ -423,6 +454,7 @@ switch ($actie) {
         antwoord(['sleutel' => icsSleutel(!empty($invoer['nieuw']))]);
     case 'vakanties':
         vereisBeheer();
+        if (soortMetRol('vakantie') === '' || ($CONFIG['vakanties_importeren'] ?? true) === false) antwoord(['toegevoegd' => [], 'overgeslagen' => [], 'mislukt' => [], 'items' => null]);
         if (!empty($invoer['automatisch'])) {
             $klaar = laad()['instellingen']['vakanties_geimporteerd'] ?? [];
             $jaren = array_values(array_diff(huidigeSchooljaren(), $klaar));

@@ -14,6 +14,24 @@ return [
     // Leeg laten = de kalender is voor iedereen met het adres te zien.
     'leden_code' => '',
 
+    // Soorten activiteiten. Laat dit weg voor de standaardsoorten van een koor
+    // (Repetitie, Extra repetitie, Optreden, Onder voorbehoud, Vergadering, Vakantie, Overig).
+    // Rollen: 'wekelijks' (vervalt in schoolvakanties, standaard niet in de lijst), 'hoogtepunt' (eerstvolgende, programma),
+    // 'voorbehoud' (nog niet zeker), 'vakantie' (hier komen de schoolvakanties in). Kleur als #rrggbb.
+    // 'soorten' => [
+    //     ['naam' => 'Training',         'kleur' => '#cfe0f3', 'rol' => 'wekelijks', 'meervoud' => 'trainingen'],
+    //     ['naam' => 'Wedstrijd',        'kleur' => '#f4a6a0', 'rol' => 'hoogtepunt'],
+    //     ['naam' => 'Onder voorbehoud', 'kleur' => '#ffe45c', 'rol' => 'voorbehoud'],
+    //     ['naam' => 'Vergadering',      'kleur' => '#c9b8e0'],
+    //     ['naam' => 'Vakantie',         'kleur' => '#b7dd9a', 'rol' => 'vakantie'],
+    // ],
+
+    // Programma (liedjes/onderdelen in volgorde) bij hoogtepunten tonen: true of false
+    'programma' => true,
+
+    // Schoolvakanties automatisch ophalen: true of false
+    'vakanties_importeren' => true,
+
     // Regio voor de schoolvakanties: noord, midden of zuid
     'regio' => 'noord',
 

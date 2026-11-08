@@ -1,12 +1,12 @@
-let ITEMS = [], JAAR = new Date().getFullYear(), TAB = 'binnenkort', FILTER = new Set(SOORTEN.filter(s => s !== 'Repetitie')), GEKOZEN = null, MAAND = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let ITEMS = [], JAAR = new Date().getFullYear(), TAB = 'binnenkort', FILTER = null, GEKOZEN = null, MAAND = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 const inhoud = document.getElementById('inhoud');
 
 function binnenkort() {
   const v = vandaagIso();
   const komend = ITEMS.filter(i => eind(i) >= v).slice(0, 12);
   const kaart = el('div', {class: 'kaart'}, komend.length ? komend.map(i => itemRij(i)) : el('p', {class: 'leeg'}, 'Er staan geen activiteiten meer gepland.'));
-  const opt = ITEMS.find(i => eind(i) >= v && (i.soort === 'Optreden' || i.soort === 'Onder voorbehoud'));
-  return [opt ? el('p', {class: 'meta', style: 'margin:0 4px 10px'}, 'Eerstvolgende optreden: ', el('b', {}, opt.titel + ' (' + kort(opt.datum) + ')')) : null, kaart];
+  const opt = ITEMS.find(i => eind(i) >= v && (isRol(i.soort, 'hoogtepunt') || isRol(i.soort, 'voorbehoud')));
+  return [opt ? el('p', {class: 'meta', style: 'margin:0 4px 10px'}, 'Eerstvolgende ' + (metRol('hoogtepunt') || 'activiteit').toLowerCase() + ': ', el('b', {}, opt.titel + ' (' + kort(opt.datum) + ')')) : null, kaart];
 }
 
 function dagDetail() {
@@ -31,10 +31,10 @@ function maand() {
   for (let k = 0; k < start; k++) rij.append(el('td'));
   for (let d = 1; d <= dagen; d++) {
     const iso = naarIso(new Date(J, m, d)), lijst = opDag(ITEMS, iso);
-    const vak = lijst.some(i => i.soort === 'Vakantie');
-    const chips = lijst.filter(i => i.soort !== 'Vakantie').slice(0, 3).map(i => el('span', {class: 'chipje ' + soortKlasse(i.soort)}, i.titel.replace(/^Wereldshot: /, '')));
+    const vak = lijst.some(i => isRol(i.soort, 'vakantie'));
+    const chips = lijst.filter(i => !isRol(i.soort, 'vakantie')).slice(0, 3).map(i => el('span', {class: 'chipje ' + soortKlasse(i.soort)}, i.titel.replace(/^Wereldshot: /, '')));
     rij.append(el('td', {}, el('button', {
-      class: [vak ? 's-Vakantie' : '', iso === v ? 'vandaag' : '', iso < v ? 'voorbij' : ''].join(' '),
+      class: [vak ? soortKlasse(metRol('vakantie')) : '', iso === v ? 'vandaag' : '', iso < v ? 'voorbij' : ''].join(' '),
       'aria-pressed': GEKOZEN === iso ? 'true' : 'false',
       'aria-label': kort(iso) + (lijst.length ? ': ' + lijst.map(i => i.titel).join(', ') : ''),
       onclick: () => { const y = scrollY; GEKOZEN = iso; teken(); scrollTo(0, y); }
@@ -52,10 +52,10 @@ function maand() {
     if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) ga(dx < 0 ? 1 : -1);
   });
   const van = naarIso(eerste), tot = naarIso(new Date(J, m, dagen));
-  const inMaand = ITEMS.filter(i => i.datum <= tot && eind(i) >= van && i.soort !== 'Repetitie');
+  const inMaand = ITEMS.filter(i => i.datum <= tot && eind(i) >= van && !isRol(i.soort, 'wekelijks'));
   return [kop, naarNu, el('div', {class: 'kaart', style: 'padding:6px'}, tabel), legenda(),
     el('h2', {class: 'maand', style: 'text-transform:none'}, 'Bijzonderheden in ' + MAANDEN[m]),
-    el('div', {class: 'kaart'}, inMaand.length ? inMaand.map(i => itemRij(i)) : el('p', {class: 'leeg'}, 'Alleen de gewone repetities.')),
+    el('div', {class: 'kaart'}, inMaand.length ? inMaand.map(i => itemRij(i)) : el('p', {class: 'leeg'}, 'Alleen de gewone ' + meervoud(WEKELIJKS()) + '.')),
     ...dagDetail()];
 }
 
@@ -72,7 +72,7 @@ function jaar() {
     for (let d = 1; d <= dagen; d++) {
       const iso = naarIso(new Date(J, m, d)), lijst = opDag(ITEMS, iso), s = hoofdSoort(lijst);
       const knop = el('button', {
-        class: [s ? soortKlasse(s) : '', s && s !== 'Vakantie' ? 'heeft' : '', iso === v ? 'vandaag' : ''].join(' '),
+        class: [s ? soortKlasse(s) : '', s && !isRol(s, 'vakantie') ? 'heeft' : '', iso === v ? 'vandaag' : ''].join(' '),
         'aria-label': kort(iso) + (lijst.length ? ': ' + lijst.map(i => i.titel).join(', ') : ''),
         'aria-pressed': GEKOZEN === iso ? 'true' : 'false',
         onclick: () => { const y = scrollY; GEKOZEN = iso; teken(); scrollTo(0, y); }
@@ -90,6 +90,7 @@ function jaar() {
 }
 
 function lijst() {
+  if (!FILTER) FILTER = new Set(SOORTEN.filter(s => !isRol(s, 'wekelijks')));
   const filters = el('div', {class: 'filters'}, SOORTEN.map(s => el('button', {
     class: soortKlasse(s), 'aria-pressed': FILTER.has(s) ? 'true' : 'false',
     onclick: () => { FILTER.has(s) ? FILTER.delete(s) : FILTER.add(s); teken(); }
@@ -129,6 +130,7 @@ function start() {
   haalLijst().then(d => {
   ITEMS = zichtbaar(d.items || []);
   NAAM_KOOR = d.naam || '';
+  if (!FILTER) FILTER = new Set(SOORTEN.filter(s => !isRol(s, 'wekelijks')));
   if (d.ics) zetAbonnement(d.ics);
   if (d.naam) { document.getElementById('naam').textContent = 'Jaarplanning ' + d.naam; document.title = 'Jaarplanning ' + d.naam; }
   teken();

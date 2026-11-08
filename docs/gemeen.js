@@ -3,18 +3,46 @@ const API = window.KK_API || 'api.php';
 const apiUrl = q => API + (API.includes('?') ? '&' : '?') + q;
 
 // Gedeelde hulpfuncties voor de leden- en beheerpagina
-const SOORTEN = ['Repetitie','Extra repetitie','Optreden','Onder voorbehoud','Vergadering','Vakantie','Overig'];
-const VOORRANG = ['Onder voorbehoud','Optreden','Vergadering','Extra repetitie','Overig','Repetitie','Vakantie'];
 const MAANDEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
 const MND = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
 const DAGEN = ['zo','ma','di','wo','do','vr','za'];
-const LABEL = {'Vakantie':'Vakantie (geen repetitie)','Onder voorbehoud':'Onder voorbehoud (nog niet zeker)'};
+
+// ---------- soorten activiteiten (komen van de server; standaard die van een koor) ----------
+// Rollen: wekelijks (vervalt in vakanties), hoogtepunt (eerstvolgende, programma), voorbehoud, vakantie
+const STANDAARD_SOORTEN = [{naam:'Repetitie',kleur:'#cfe0f3',rol:'wekelijks'},{naam:'Extra repetitie',kleur:'#8fd3cf',rol:''},{naam:'Optreden',kleur:'#f4a6a0',rol:'hoogtepunt'},
+  {naam:'Onder voorbehoud',kleur:'#ffe45c',rol:'voorbehoud'},{naam:'Vergadering',kleur:'#c9b8e0',rol:''},{naam:'Vakantie',kleur:'#b7dd9a',rol:'vakantie'},{naam:'Overig',kleur:'#f8cbad',rol:''}];
+let SOORTEN = [], VOORRANG = [], LABEL = {}, ROL = {}, KLEUR = {}, MEERVOUD = {}, PROGRAMMA = true;
+const isRol = (s, rol) => ROL[s] === rol;
+const metRol = rol => SOORTEN.find(s => ROL[s] === rol) || '';
+const meervoud = s => MEERVOUD[s] || (/e$/i.test(s) ? s + 's' : s + 'en');
+const WEKELIJKS = () => (metRol('wekelijks') || 'activiteit').toLowerCase();
+function zetSoorten(defs, programma) {
+  if (!Array.isArray(defs) || !defs.length || typeof defs[0] !== 'object') defs = STANDAARD_SOORTEN;
+  if (programma !== undefined) PROGRAMMA = programma !== false;
+  SOORTEN = defs.map(d => d.naam); ROL = {}; KLEUR = {}; MEERVOUD = {}; LABEL = {};
+  for (const d of defs) { ROL[d.naam] = d.rol || ''; KLEUR[d.naam] = d.kleur; if (d.meervoud) MEERVOUD[d.naam] = d.meervoud; }
+  const metR = r => SOORTEN.filter(s => ROL[s] === r);
+  VOORRANG = [...metR('voorbehoud'), ...metR('hoogtepunt'), ...metR(''), ...metR('wekelijks'), ...metR('vakantie')];
+  const w = metRol('wekelijks');
+  for (const s of metR('vakantie')) LABEL[s] = s + (w ? ' (geen ' + w.toLowerCase() + ')' : '');
+  for (const s of metR('voorbehoud')) LABEL[s] = /zeker/i.test(s) ? s : s + ' (nog niet zeker)';
+  // Eigen soorten krijgen hun kleur via een stijlblok; de standaardsoorten hebben hun kleuren al in stijl.css
+  const eigen = JSON.stringify(defs.map(d => [d.naam, d.kleur])) !== JSON.stringify(STANDAARD_SOORTEN.map(d => [d.naam, d.kleur]));
+  let st = document.getElementById('soortkleuren');
+  if (!eigen) { if (st) st.remove(); return; }
+  if (!st) { st = document.createElement('style'); st.id = 'soortkleuren'; document.head.append(st); }
+  const donker = pre => defs.map(d => pre + '.' + soortKlasse(d.naam) + '{background:color-mix(in srgb,' + d.kleur + ' 45%,#1b1b1b)}').join(' ');
+  const sel = (k, rol) => ['.' + k, '.mini td button.' + k, '.maand td.' + k, 'table.klassiek td.' + k].concat(rol === 'vakantie' ? ['.groot td button.' + k] : []).join(',');
+  st.textContent = defs.map(d => sel(soortKlasse(d.naam), d.rol) + '{background:' + d.kleur + '}').join('\n') +
+    '\n@media (prefers-color-scheme:dark){' + donker(':root:not([data-theme="light"]):not(.licht) ') + '}\n' + donker(':root[data-theme="dark"] ');
+}
+zetSoorten(STANDAARD_SOORTEN);
 
 const naarDatum = s => { const [j,m,d] = s.split('-').map(Number); return new Date(j, m-1, d); };
 const naarIso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 const vandaagIso = () => naarIso(new Date());
 const kort = s => { const d = naarDatum(s); return DAGEN[d.getDay()] + ' ' + d.getDate() + ' ' + MND[d.getMonth()]; };
-const soortKlasse = s => 's-' + s.replace(/\s+/g, '-');
+const soortKlasse = s => 's-' + s.replace(/[^A-Za-z0-9_-]+/g, '-');
 const eind = it => it.tm || it.datum;
 
 function el(tag, attrs, ...kinderen) {
@@ -72,7 +100,7 @@ function jarenVan(items) {
 
 // Repetities die in een vakantie vallen, vervallen vanzelf
 function vervalt(it, items) {
-  return it.soort === 'Repetitie' && items.some(v => v.soort === 'Vakantie' && v.datum <= it.datum && eind(v) >= it.datum);
+  return isRol(it.soort, 'wekelijks') && items.some(v => isRol(v.soort, 'vakantie') && v.datum <= it.datum && eind(v) >= it.datum);
 }
 function zichtbaar(items) { return items.filter(i => !vervalt(i, items)); }
 
@@ -89,6 +117,7 @@ let LEDEN = ''; try { LEDEN = localStorage.getItem('kk-leden') || ''; } catch (e
 async function haalLijst() {
   const r = await fetch(apiUrl('actie=lijst'), {cache: 'no-store', headers: LEDEN ? {'X-Leden': LEDEN} : {}});
   const d = await r.json().catch(() => ({}));
+  if (r.ok) zetSoorten(d.soorten, d.programma);
   if (r.status === 401 && d.afgeschermd) { const e = new Error(d.fout); e.afgeschermd = true; throw e; }
   if (!r.ok) throw new Error(d.fout || 'De planning kon niet geladen worden.');
   return d;
