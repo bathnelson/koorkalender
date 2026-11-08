@@ -1,6 +1,6 @@
 <?php
 // Instellingen voor één vereniging. De bestandsnaam (zonder .php) is het eerste deel van het webadres:
-// voorbeeld.php hoort bij voorbeeld.verenigingskalender.nl. Alleen kleine letters, cijfers en streepjes.
+// voorbeeld.php hoort bij voorbeeld.mijndomein.nl. Alleen kleine letters, cijfers en streepjes.
 // Instellingen voor de jaarplanning. Pas alleen de waarden tussen de aanhalingstekens aan.
 return [
     // Naam boven de pagina
