@@ -9,6 +9,8 @@ Een jaarplanning voor een koor: leden bekijken hem op hun telefoon (binnenkort, 
 
 De pagina's en `api.php` staan op hetzelfde domein, dus er is geen extra instelling voor het API-adres nodig.
 
+Wie de host beheert: zie [HOSTBEHEER.md](HOSTBEHEER.md) voor installeren, meerdere verenigingen, bijwerken, reservekopieën, beveiliging en problemen oplossen.
+
 ## Eenmalig instellen
 
 1. GitHub: Settings > Pages > Deploy from a branch > `main` en `/docs`.
