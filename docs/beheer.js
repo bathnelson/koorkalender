@@ -108,6 +108,8 @@ zetSoortKeuzes();
 
 async function laad() {
   const lijstData = await api('lijst'); zetSoorten(lijstData.soorten, lijstData.programma); zetSoortKeuzes(); ITEMS = lijstData.items || []; tekenLijst();
+  JARIG = lijstData.verjaardagen || []; tekenJarig();
+  toonJarigLink().catch(e => zeg('Verjaardagen ophalen lukte niet: ' + e.message));
   api('leden_link', {}).then(toonLeden).catch(e => zeg('Ledenlink ophalen lukte niet: ' + e.message));
   api('ics_link', {}).then(d => toonIcs(d.sleutel)).catch(e => fout('icsfout', 'Agendalink maken lukte niet: ' + e.message));
   // Schoolvakanties van dit en volgend schooljaar automatisch ophalen (eenmalig per schooljaar)
@@ -150,6 +152,64 @@ $('icsnieuw').onclick = async () => {
   if (!confirm('Nieuwe link maken? De oude link werkt dan niet meer; leden moeten zich opnieuw abonneren.')) return;
   try { toonIcs((await api('ics_link', {nieuw: true})).sleutel); zeg('Nieuwe agendalink gemaakt.'); } catch (e) { alert(e.message); }
 };
+// ---------- verjaardagen ----------
+let JARIG = [];
+$('j-dag').replaceChildren(...Array.from({length: 31}, (_, i) => el('option', {value: String(i + 1).padStart(2, '0')}, String(i + 1))));
+$('j-maand').replaceChildren(...MAANDEN.map((m, i) => el('option', {value: String(i + 1).padStart(2, '0')}, m)));
+function tekenJarig() {
+  $('jarigaantal').textContent = '(' + JARIG.length + ')';
+  const delen = [];
+  for (let m = 0; m < 12; m++) {
+    const inM = JARIG.filter(j => Number(j.dag.slice(0, 2)) === m + 1);
+    if (!inM.length) continue;
+    delen.push(el('h2', {class: 'maand'}, MAANDEN[m]), el('div', {class: 'kaart'}, inM.map(j => jarigRij(j, volgendeVerjaardag(j.dag), el('div', {class: 'acties'},
+      el('button', {type: 'button', onclick: () => bewerkJarig(j), 'aria-label': 'Wijzig ' + j.naam}, 'Wijzig'),
+      el('button', {type: 'button', class: 'gevaar', onclick: () => wegJarig(j), 'aria-label': 'Verwijder ' + j.naam}, 'Verwijder'))))));
+  }
+  $('jariglijst').replaceChildren(...(delen.length ? delen : [el('p', {class: 'leeg'}, 'Nog geen verjaardagen. Voeg ze een voor een toe of plak een lijst.')]));
+}
+function bewerkJarig(j) {
+  j = j || {id: '', naam: '', dag: '01-01'};
+  $('jdlgtitel').textContent = j.id ? 'Verjaardag wijzigen' : 'Nieuwe verjaardag';
+  $('j-id').value = j.id; $('j-naam').value = j.naam; $('j-maand').value = j.dag.slice(0, 2); $('j-dag').value = j.dag.slice(3);
+  $('j-weg').classList.toggle('verborgen', !j.id); $('j-weg').onclick = () => { $('dlg3').close(); wegJarig(j); };
+  fout('dlg3fout'); $('dlg3').showModal();
+}
+async function wegJarig(j) {
+  if (!confirm('Verjaardag van ' + j.naam + ' verwijderen?')) return;
+  try { JARIG = (await api('verjaardag_verwijder', {ids: [j.id]})).verjaardagen; tekenJarig(); zeg('Verwijderd: ' + j.naam + '.'); } catch (e) { alert(e.message); }
+}
+$('form3').addEventListener('submit', async e => {
+  e.preventDefault();
+  const verjaardag = {id: $('j-id').value || undefined, naam: $('j-naam').value, dag: $('j-maand').value + '-' + $('j-dag').value};
+  try { const d = await api('verjaardag_opslaan', {verjaardag}); JARIG = d.verjaardagen; tekenJarig(); toonJarigLink(); $('dlg3').close(); zeg('Opgeslagen: ' + verjaardag.naam + ' (' + dagTekst(verjaardag.dag) + ').'); }
+  catch (err) { fout('dlg3fout', err.message); }
+});
+$('form4').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    const d = await api('verjaardagen_plakken', {tekst: $('p-tekst').value}); JARIG = d.verjaardagen; tekenJarig(); toonJarigLink();
+    if (d.niet_herkend.length) { $('p-tekst').value = d.niet_herkend.join('\n'); fout('dlg4fout', d.aantal + ' toegevoegd. Deze regels zijn niet herkend; verbeter ze of klik op Annuleren.'); }
+    else { $('dlg4').close(); $('p-tekst').value = ''; zeg(d.aantal + ' verjaardagen toegevoegd.'); }
+  } catch (err) { fout('dlg4fout', err.message); }
+});
+$('jnieuw').onclick = () => bewerkJarig(null);
+$('jplak').onclick = () => { fout('dlg4fout'); $('dlg4').showModal(); };
+$('j-annuleer').onclick = () => $('dlg3').close();
+$('p-annuleer').onclick = () => $('dlg4').close();
+async function toonJarigLink(nieuw) {
+  const d = await api('verjaardag_link', nieuw ? {nieuw: true} : {});
+  $('jarigblok').classList.toggle('verborgen', !d.aan);
+  $('jariguit').classList.toggle('verborgen', d.afgeschermd);
+  const https = new URL(apiUrl('actie=jarig&sleutel=' + d.sleutel), location.href).href;
+  $('jariglink').value = https; $('jarigtest').href = https;
+}
+$('jarigkopie').onclick = async () => { try { await navigator.clipboard.writeText($('jariglink').value); zeg('Link gekopieerd.'); } catch (e) { $('jariglink').select(); } };
+$('jarigsleutel').onclick = async () => {
+  if (!confirm('Nieuwe link voor de verjaardagen maken? De oude werkt dan niet meer; leden moeten zich opnieuw abonneren.')) return;
+  try { await toonJarigLink(true); zeg('Nieuwe link voor de verjaardagen gemaakt.'); } catch (e) { alert(e.message); }
+};
+
 (async () => {
   try { const s = TOKEN ? await api('sessie') : {ingelogd: false}; if (s.ingelogd) { await laad(); toon(true); } else toon(false); }
   catch (e) { toon(false); fout('loginfout', e.message); }

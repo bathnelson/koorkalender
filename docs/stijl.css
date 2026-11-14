@@ -119,3 +119,10 @@ details.programma{margin-top:6px;font-size:.92rem}
 details.programma>summary{cursor:pointer;color:var(--accent);font-weight:600}
 details.programma ol{margin:6px 0 2px;padding-left:1.6em}
 details.programma li{margin:2px 0}
+.item.jarig .dag{background:#fde2ef}
+:root[data-theme="dark"] .item.jarig .dag{background:#5a2a40}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .item.jarig .dag{background:#5a2a40}}
+.groot .chipje.jarig{background:transparent;padding-left:0}
+.knoplink.klein{min-height:34px;padding:4px 12px;font-size:.9rem}
+.tabs button{flex:1 1 auto;min-width:0;padding:8px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:420px){.tabs button{font-size:.88rem}}@media (max-width:350px){.tabs{gap:2px}.tabs button{font-size:.8rem;padding:8px 2px}}

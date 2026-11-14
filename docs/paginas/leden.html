@@ -13,12 +13,13 @@
     <button role="tab" id="tab-maand" aria-selected="false">Maand</button>
     <button role="tab" id="tab-jaar" aria-selected="false">Jaar</button>
     <button role="tab" id="tab-lijst" aria-selected="false">Lijst</button>
+    <button role="tab" id="tab-jarig" aria-selected="false" class="verborgen">Jarig</button>
   </div>
 
 <dialog id="dlg-abo">
   <form method="dialog">
-    <h2>In je eigen agenda</h2>
-    <p class="meta">Met een abonnement staat de planning in de agenda op je telefoon of computer en werkt hij zichzelf bij. Repetities in vakanties staan er niet in. Deel deze link alleen met leden.</p>
+    <h2 id="abo-titel">In je eigen agenda</h2>
+    <p class="meta" id="abo-tekst">Met een abonnement staat de planning in de agenda op je telefoon of computer en werkt hij zichzelf bij. Repetities in vakanties staan er niet in. Deel deze link alleen met leden.</p>
     <div class="balk" style="flex-direction:column;align-items:stretch;gap:8px;margin:12px 0">
       <a id="abo-webcal" class="knoplink" href="#">Abonneer in Agenda (iPhone, iPad, Mac)</a>
       <a id="abo-google" class="knoplink" href="#" target="_blank" rel="noopener">Abonneer in Google Agenda</a>

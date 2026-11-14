@@ -241,6 +241,81 @@ function icsSleutel(bool $nieuw = false): string {
     return $sleutel;
 }
 
+// ---------- verjaardagen ----------
+// Alleen naam en dag (MM-DD), zonder geboortejaar: zo min mogelijk persoonsgegevens.
+// Leden zien ze alleen als de kalender is afgeschermd met een ledencode; het eigen agenda-abonnement werkt met een eigen geheime link.
+const MAX_VERJAARDAGEN = 500;
+function verjaardagenAan(array $cfg): bool { return ($cfg['verjaardagen'] ?? true) !== false; }
+function geldigeDag($s): bool {
+    return is_string($s) && preg_match('/^(\d{2})-(\d{2})$/', $s, $m) && checkdate((int)$m[1], (int)$m[2], 2024);
+}
+function schoonVerjaardag($in): array {
+    if (!is_array($in)) fout('Ongeldige verjaardag.');
+    $v = [
+        'id' => (isset($in['id']) && is_string($in['id']) && preg_match('/^[a-z0-9]{1,20}$/', $in['id'])) ? $in['id'] : 'j' . bin2hex(random_bytes(5)),
+        'naam' => tekst($in['naam'] ?? '', 80),
+        'dag' => $in['dag'] ?? '',
+    ];
+    if ($v['naam'] === '') fout('Vul een naam in.');
+    if (!geldigeDag($v['dag'])) fout('Kies een geldige dag en maand.');
+    return $v;
+}
+// Leest regels als "Anna 14-03", "Anna;14-3-1980", "14 maart Anna" of "Anna, 14/03". Een geboortejaar wordt weggelaten.
+function leesVerjaardagen(string $tekst): array {
+    $mnd = ['jan' => 1, 'feb' => 2, 'mrt' => 3, 'maa' => 3, 'apr' => 4, 'mei' => 5, 'jun' => 6, 'jul' => 7, 'aug' => 8, 'sep' => 9, 'okt' => 10, 'oct' => 10, 'nov' => 11, 'dec' => 12];
+    $goed = []; $fout = [];
+    foreach (preg_split('/\R/', $tekst) as $regel) {
+        $regel = trim($regel);
+        if ($regel === '') continue;
+        $d = $m = 0; $naam = '';
+        if (preg_match('/(\d{1,2})\s*[-\/.]\s*(\d{1,2})(?:\s*[-\/.]\s*(\d{2,4}))?/', $regel, $x)) { $d = (int)$x[1]; $m = (int)$x[2]; $naam = str_replace($x[0], ' ', $regel); }
+        elseif (preg_match('/(\d{1,2})\s+([a-z]{3})[a-z]*\.?(?:\s+(\d{4}))?/iu', $regel, $x) && isset($mnd[strtolower($x[2])])) { $d = (int)$x[1]; $m = $mnd[strtolower($x[2])]; $naam = str_replace($x[0], ' ', $regel); }
+        $naam = trim(preg_replace('/\s+/', ' ', trim($naam, " \t;,:|-")));
+        if ($naam === '' || !checkdate($m, $d, 2024)) { $fout[] = mb_substr($regel, 0, 60); continue; }
+        $goed[] = ['naam' => mb_substr($naam, 0, 80), 'dag' => sprintf('%02d-%02d', $m, $d)];
+    }
+    return [$goed, $fout];
+}
+function sorteerVerjaardagen(array &$d): void {
+    $d['verjaardagen'] = array_values($d['verjaardagen'] ?? []);
+    usort($d['verjaardagen'], function ($a, $b) { return [$a['dag'], $a['naam']] <=> [$b['dag'], $b['naam']]; });
+}
+function verjaardagSleutel(bool $nieuw = false): string {
+    $data = laad();
+    if (!$nieuw && !empty($data['instellingen']['verjaardag_sleutel'])) return $data['instellingen']['verjaardag_sleutel'];
+    $sleutel = bin2hex(random_bytes(12));
+    wijzig(function ($d) use ($sleutel) { $d['instellingen']['verjaardag_sleutel'] = $sleutel; return $d; });
+    return $sleutel;
+}
+function verjaardagenIcs(array $lijst, array $cfg): void {
+    $host = preg_replace('/[^a-z0-9.\-]/i', '', explode(':', $_SERVER['HTTP_HOST'] ?? 'jaarplanning')[0]);
+    $r = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Jaarplanning//NL', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+        'X-WR-CALNAME:' . icsTekst('Verjaardagen ' . ($cfg['naam'] ?? '')), 'REFRESH-INTERVAL;VALUE=DURATION:PT12H', 'X-PUBLISHED-TTL:PT12H'];
+    $stamp = gmdate('Ymd\THis\Z');
+    $voor = trim((string)($cfg['ics_voorvoegsel'] ?? ''));
+    foreach ($lijst as $v) {
+        [$m, $d] = array_map('intval', explode('-', $v['dag']));
+        $start = sprintf('2000%02d%02d', $m, $d);
+        $r[] = 'BEGIN:VEVENT';
+        $r[] = 'UID:' . $v['id'] . '-jarig@' . $host;
+        $r[] = 'DTSTAMP:' . $stamp;
+        $r[] = 'DTSTART;VALUE=DATE:' . $start;
+        $r[] = 'DTEND;VALUE=DATE:' . date('Ymd', strtotime("2000-$m-$d +1 day"));
+        // 29 februari: in andere jaren op 28 februari
+        $r[] = $v['dag'] === '02-29' ? 'RRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1' : 'RRULE:FREQ=YEARLY';
+        $r[] = 'SUMMARY:' . icsTekst(zonderLinks(($voor !== '' ? "[$voor] " : '') . 'Jarig: ' . $v['naam']));
+        $r[] = 'CATEGORIES:Verjaardag';
+        $r[] = 'TRANSP:TRANSPARENT';
+        $r[] = 'END:VEVENT';
+    }
+    $r[] = 'END:VCALENDAR';
+    header('Content-Type: text/calendar; charset=utf-8');
+    header('Content-Disposition: inline; filename="verjaardagen.ics"');
+    header('Cache-Control: no-cache');
+    foreach ($r as $regel) echo icsRegel($regel);
+    exit;
+}
+
 // ---------- afscherming voor leden ----------
 // Staat aan zodra in config.php een ledencode is ingevuld. Leden komen binnen met de geheime ledenlink (?k=...)
 // of door de ledencode in te typen; daarna onthoudt hun browser de sleutel.
@@ -440,7 +515,19 @@ $methode = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 if ($methode === 'GET' && $actie === 'lijst') {
     if (!magLijstZien($CONFIG)) antwoord(['fout' => 'Deze kalender is alleen voor leden.', 'afgeschermd' => true], 401);
-    antwoord(['naam' => $CONFIG['naam'] ?? '', 'soorten' => soortDefs(), 'programma' => ($CONFIG['programma'] ?? true) !== false, 'items' => laad()['items'], 'ics' => icsSleutel()]);
+    $uit = ['naam' => $CONFIG['naam'] ?? '', 'soorten' => soortDefs(), 'programma' => ($CONFIG['programma'] ?? true) !== false, 'items' => laad()['items'], 'ics' => icsSleutel()];
+    // Verjaardagen alleen voor leden van een afgeschermde kalender (en voor de secretaris)
+    if (verjaardagenAan($CONFIG) && (ledenAfgeschermd($CONFIG) || ingelogd())) {
+        $uit['verjaardagen'] = laad()['verjaardagen'] ?? [];
+        if ($uit['verjaardagen']) $uit['jarig'] = verjaardagSleutel();
+    }
+    antwoord($uit);
+}
+if ($methode === 'GET' && $actie === 'jarig') {
+    $sleutel = $_GET['sleutel'] ?? '';
+    $goed = laad()['instellingen']['verjaardag_sleutel'] ?? '';
+    if (!verjaardagenAan($CONFIG) || !is_string($sleutel) || $goed === '' || !hash_equals($goed, $sleutel)) { http_response_code(404); exit('Niet gevonden.'); }
+    verjaardagenIcs(laad()['verjaardagen'] ?? [], $CONFIG);
 }
 if ($methode === 'GET' && $actie === 'ics') {
     $sleutel = $_GET['sleutel'] ?? '';
@@ -509,6 +596,39 @@ switch ($actie) {
     case 'ics_link':
         vereisBeheer();
         antwoord(['sleutel' => icsSleutel(!empty($invoer['nieuw']))]);
+    case 'verjaardag_opslaan':
+    case 'verjaardagen_plakken':
+    case 'verjaardag_verwijder':
+        vereisBeheer();
+        if (!verjaardagenAan($CONFIG)) fout('Verjaardagen staan uit in de instellingen.', 403);
+        $nieuw = []; $mislukt = [];
+        if ($actie === 'verjaardag_opslaan') $nieuw = [schoonVerjaardag($invoer['verjaardag'] ?? null)];
+        if ($actie === 'verjaardagen_plakken') {
+            [$gelezen, $mislukt] = leesVerjaardagen(is_string($invoer['tekst'] ?? null) ? $invoer['tekst'] : '');
+            $nieuw = array_map('schoonVerjaardag', $gelezen);
+            if (!$nieuw) fout('Geen verjaardagen herkend. Zet op elke regel een naam en een datum, bijvoorbeeld: Anna 14-03');
+        }
+        $ids = $actie === 'verjaardag_verwijder' && is_array($invoer['ids'] ?? null) ? $invoer['ids'] : [];
+        $data = wijzig(function ($d) use ($nieuw, $ids) {
+            $lijst = $d['verjaardagen'] ?? [];
+            if ($ids) $lijst = array_filter($lijst, function ($v) use ($ids) { return !in_array($v['id'], $ids, true); });
+            foreach ($nieuw as $v) {
+                $gevonden = false;
+                foreach ($lijst as $i => $b) {
+                    // Zelfde id: wijzigen. Zelfde naam en dag: niet dubbel toevoegen.
+                    if ($b['id'] === $v['id'] || ($b['naam'] === $v['naam'] && $b['dag'] === $v['dag'])) { $lijst[$i] = $v; $gevonden = true; break; }
+                }
+                if (!$gevonden) $lijst[] = $v;
+            }
+            if (count($lijst) > MAX_VERJAARDAGEN) fout('Hooguit ' . MAX_VERJAARDAGEN . ' verjaardagen.');
+            $d['verjaardagen'] = $lijst;
+            sorteerVerjaardagen($d);
+            return $d;
+        });
+        antwoord(['ok' => true, 'aantal' => count($nieuw), 'niet_herkend' => $mislukt, 'verjaardagen' => $data['verjaardagen']]);
+    case 'verjaardag_link':
+        vereisBeheer();
+        antwoord(['sleutel' => verjaardagSleutel(!empty($invoer['nieuw'])), 'afgeschermd' => ledenAfgeschermd($CONFIG), 'aan' => verjaardagenAan($CONFIG)]);
     case 'vakanties':
         vereisBeheer();
         if (soortMetRol('vakantie') === '' || ($CONFIG['vakanties_importeren'] ?? true) === false) antwoord(['toegevoegd' => [], 'overgeslagen' => [], 'mislukt' => [], 'items' => null]);

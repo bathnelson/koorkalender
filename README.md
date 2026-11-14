@@ -53,6 +53,10 @@ Alleen de datamap hoeft schrijfbaar te zijn voor de webserver. Zet de PHP- en ht
 - Na 10 foute pogingen (wachtwoord of ledencode) moet een adres een kwartier wachten.
 - In het agenda-abonnement worden links uit de teksten gehaald, zodat een gekaapte kalender geen phishinglinks in agenda's kan zetten.
 
+## Verjaardagen
+
+Op de beheerpagina staat onder "Verjaardagen" een lijst met naam en dag (zonder geboortejaar). Je kunt ze een voor een invoeren of een hele lijst plakken. Leden zien ze in het tabblad "Jarig", bij "Binnenkort" en in de maandweergave, en kunnen ze als aparte agenda abonneren. Leden zien de verjaardagen alleen als de kalender is afgeschermd met een `leden_code`. Met `'verjaardagen' => false` staat het helemaal uit.
+
 ## Afschermen voor leden
 
 Vul in `config.php` een `leden_code` in. De kalender is dan alleen te zien voor wie via de geheime ledenlink komt (te vinden op de beheerpagina, onder "Ledenlink") of die code één keer intypt. De browser onthoudt dat. Het agenda-abonnement werkt met een eigen geheime link en blijft gewoon werken.

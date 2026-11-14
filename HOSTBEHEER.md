@@ -84,6 +84,7 @@ Om een oude versie terug te zetten: kopieer de gewenste `backup/planning-JJJJMMD
 | Ledencode | idem, `leden_code` | Pas hem aan. Wie de oude code intypte, blijft binnen tot je ook een nieuwe ledenlink maakt. |
 | Ledenlink | in `planning.json` | Beheerpagina, onder "Ledenlink (afgeschermde kalender)": "Nieuwe link". De oude werkt dan niet meer. |
 | Agenda-abonnement | in `planning.json` | Beheerpagina, onder "Agendalink voor leden (abonnement)": "Nieuwe link". Iedereen moet zich daarna opnieuw abonneren. |
+| Agenda verjaardagen | in `planning.json` | Beheerpagina, onder "Verjaardagen": "Nieuwe link". Iedereen moet zich daarna opnieuw abonneren. |
 | Inlogsleutel | in `planning.json` (`token_geheim`) | Wordt vanzelf gemaakt. Verander je het wachtwoord, dan vervallen alle inlogtokens toch al. |
 
 Een inlogtoken op een apparaat is 30 dagen geldig.
@@ -99,6 +100,8 @@ Wat de app zelf doet:
 - Na 10 foute wachtwoorden of ledencodes binnen een kwartier moet dat IP-adres een kwartier wachten. Dat staat bijgehouden in `<datamap>/.pogingen.json`. Zit iemand onterecht vast, dan kun je dat bestand weggooien.
 - Wachtwoord, ledencode en sleutels worden met een tijdsveilige vergelijking gecontroleerd.
 - In het agenda-abonnement worden links uit de teksten gehaald, zodat een gekaapte kalender geen phishinglinks in de agenda's van leden kan zetten.
+
+- Verjaardagen zijn persoonsgegevens. De app bewaart alleen naam en dag, zonder geboortejaar, en laat ze alleen zien als de kalender met een ledencode is afgeschermd. Vraag leden of ze erin willen staan.
 
 Wat jij als beheerder doet:
 

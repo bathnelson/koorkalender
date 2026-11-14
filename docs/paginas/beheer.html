@@ -37,6 +37,22 @@
       <p class="meta">Zet deze link achter het icoontje op de ledensite. Wie via deze link komt, ziet de kalender meteen; de telefoon onthoudt dat. Wie zonder link komt, moet de ledencode uit config.php intypen. Maak een nieuwe link als hij uitgelekt is; leden die via de oude link binnenkwamen, moeten dan opnieuw via de nieuwe link of de code.</p>
       <div class="balk" style="margin:8px 0 4px"><input id="ledenlink" readonly aria-label="Ledenlink" style="flex:1 1 260px;width:auto"><button id="ledenkopie">Kopieer link</button><button id="ledennieuw" class="gevaar">Nieuwe link</button></div>
     </details>
+    <details class="kaart verborgen" id="jarigblok" style="padding:10px 14px;margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:600">Verjaardagen <span id="jarigaantal" class="meta"></span></summary>
+      <p id="jariguit" class="melding verborgen">De kalender is niet afgeschermd. Leden zien de verjaardagen pas als er een ledencode in de instellingen op de server staat; alleen het agenda-abonnement hieronder werkt al.</p>
+      <p class="meta">Alleen naam en dag, zonder geboortejaar. Leden zien ze in het tabblad "Jarig" en kunnen ze als aparte agenda abonneren.</p>
+      <div class="balk" style="margin:8px 0">
+        <button class="hoofd" id="jnieuw" type="button">+ Verjaardag</button>
+        <button id="jplak" type="button">Lijst plakken</button>
+      </div>
+      <div id="jariglijst"></div>
+      <h3 style="font-size:.95rem;margin:14px 0 4px">Agendalink voor de verjaardagen</h3>
+      <div class="balk" style="margin:4px 0"><input id="jariglink" readonly aria-label="Agendalink verjaardagen" style="flex:1 1 260px;width:auto"><button id="jarigkopie" type="button">Kopieer link</button></div>
+      <div class="balk" style="margin:4px 0">
+        <a id="jarigtest" class="knoplink" href="#" target="_blank" rel="noopener">Test: bekijk het bestand</a>
+        <button id="jarigsleutel" class="gevaar" type="button">Nieuwe link</button>
+      </div>
+    </details>
     <p id="melding" class="melding goed verborgen" role="status"></p>
     <div id="lijst"></div>
   </section>
@@ -88,6 +104,37 @@
     <div class="knoppen">
       <button type="button" id="r-annuleer">Annuleren</button>
       <button type="submit" class="hoofd" id="r-ok">Toevoegen</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg3">
+  <form id="form3" method="dialog">
+    <h2 id="jdlgtitel">Verjaardag</h2>
+    <input type="hidden" id="j-id">
+    <div class="veld"><label for="j-naam">Naam</label><input id="j-naam" required maxlength="80" autocomplete="off"></div>
+    <div class="rij">
+      <div class="veld"><label for="j-dag">Dag</label><select id="j-dag"></select></div>
+      <div class="veld"><label for="j-maand">Maand</label><select id="j-maand"></select></div>
+    </div>
+    <p id="dlg3fout" class="melding verborgen"></p>
+    <div class="knoppen">
+      <button type="button" class="gevaar verborgen" id="j-weg">Verwijderen</button>
+      <button type="button" id="j-annuleer">Annuleren</button>
+      <button type="submit" class="hoofd">Opslaan</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg4">
+  <form id="form4" method="dialog">
+    <h2>Verjaardagen plakken</h2>
+    <p class="meta">Eén persoon per regel, met naam en datum, bijvoorbeeld uit een ledenlijst in Excel. Een geboortejaar wordt weggelaten. Wie er al in staat met dezelfde naam en dag, komt er niet dubbel in.</p>
+    <div class="veld"><textarea id="p-tekst" rows="8" placeholder="Anna de Vries 14-03&#10;Piet Jansen;2-11-1975&#10;21 juni Fatima"></textarea></div>
+    <p id="dlg4fout" class="melding verborgen"></p>
+    <div class="knoppen">
+      <button type="button" id="p-annuleer">Annuleren</button>
+      <button type="submit" class="hoofd">Toevoegen</button>
     </div>
   </form>
 </dialog>

@@ -171,3 +171,22 @@ function maandLijst(items, rij, jaar) {
   }
   return delen;
 }
+
+// ---------- verjaardagen (naam en dag als MM-DD, zonder jaar) ----------
+// 29 februari valt in een gewoon jaar op 28 februari
+const isSchrikkel = j => new Date(j, 1, 29).getMonth() === 1;
+const dagInJaar = (dag, j) => (dag === '02-29' && !isSchrikkel(j) ? '02-28' : dag);
+const jarigOp = (lijst, iso) => lijst.filter(v => dagInJaar(v.dag, Number(iso.slice(0, 4))) === iso.slice(5));
+function volgendeVerjaardag(dag) {
+  const v = vandaagIso(), j = Number(v.slice(0, 4));
+  const ditJaar = j + '-' + dagInJaar(dag, j);
+  return ditJaar >= v ? ditJaar : (j + 1) + '-' + dagInJaar(dag, j + 1);
+}
+const dagTekst = dag => { const [m, d] = dag.split('-').map(Number); return d + ' ' + MAANDEN[m - 1]; };
+function jarigRij(v, iso, extra) {
+  const d = naarDatum(iso), vandaag = iso === vandaagIso();
+  return el('div', {class: 'item jarig'},
+    el('div', {class: 'dag'}, el('span', {}, DAGEN[d.getDay()]), el('b', {}, String(d.getDate())), el('span', {}, MND[d.getMonth()])),
+    el('div', {class: 'info'}, el('div', {class: 'titel'}, '\u{1F382} ' + v.naam), el('div', {class: 'meta'}, vandaag ? 'Vandaag jarig!' : 'Jarig')),
+    extra || null);
+}

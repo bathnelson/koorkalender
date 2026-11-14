@@ -31,6 +31,10 @@ return [
     // Programma (liedjes/onderdelen in volgorde) bij hoogtepunten tonen: true of false
     'programma' => true,
 
+    // Verjaardagen (naam en dag, zonder jaar) met een eigen agenda-abonnement: true of false.
+    // Leden zien ze alleen als de kalender met een leden_code is afgeschermd.
+    'verjaardagen' => true,
+
     // Schoolvakanties automatisch ophalen: true of false
     'vakanties_importeren' => true,
 

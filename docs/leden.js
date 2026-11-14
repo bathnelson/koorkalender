@@ -1,3 +1,4 @@
+let JARIG = [], JARIG_SLEUTEL = '', ICS_SLEUTEL = '';
 let ITEMS = [], JAAR = new Date().getFullYear(), TAB = 'binnenkort', FILTER = null, GEKOZEN = null, MAAND = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 const inhoud = document.getElementById('inhoud');
 
@@ -6,15 +7,20 @@ function binnenkort() {
   const komend = ITEMS.filter(i => eind(i) >= v).slice(0, 12);
   const kaart = el('div', {class: 'kaart'}, komend.length ? komend.map(i => itemRij(i)) : el('p', {class: 'leeg'}, 'Er staan geen activiteiten meer gepland.'));
   const opt = ITEMS.find(i => eind(i) >= v && (isRol(i.soort, 'hoogtepunt') || isRol(i.soort, 'voorbehoud')));
-  return [opt ? el('p', {class: 'meta', style: 'margin:0 4px 10px'}, 'Eerstvolgende ' + (metRol('hoogtepunt') || 'activiteit').toLowerCase() + ': ', el('b', {}, opt.titel + ' (' + kort(opt.datum) + ')')) : null, kaart];
+  const week = naarIso(new Date(Date.now() + 7 * 864e5));
+  const jarig = JARIG.map(j => [j, volgendeVerjaardag(j.dag)]).filter(([, iso]) => iso <= week).sort((a, b) => a[1] < b[1] ? -1 : 1);
+  const jarigTekst = jarig.length ? el('p', {class: 'meta', style: 'margin:0 4px 10px'}, '\u{1F382} Jarig: ',
+    jarig.flatMap(([j, iso], n) => [n ? ', ' : '', el('b', {}, j.naam), ' (' + (iso === v ? 'vandaag' : kort(iso)) + ')'])) : null;
+  return [opt ? el('p', {class: 'meta', style: 'margin:0 4px 10px'}, 'Eerstvolgende ' + (metRol('hoogtepunt') || 'activiteit').toLowerCase() + ': ', el('b', {}, opt.titel + ' (' + kort(opt.datum) + ')')) : null, jarigTekst, kaart];
 }
 
 function dagDetail() {
   if (!GEKOZEN) return [];
-  const lijst = opDag(ITEMS, GEKOZEN);
+  const lijst = opDag(ITEMS, GEKOZEN), jarig = jarigOp(JARIG, GEKOZEN);
   return [el('div', {id: 'dagdetail', class: 'kaart', role: 'region', 'aria-label': 'Details ' + kort(GEKOZEN)},
     el('button', {class: 'sluit', onclick: () => { const y = scrollY; GEKOZEN = null; teken(); scrollTo(0, y); }}, 'Sluiten'),
-    lijst.length ? lijst.map(i => itemRij(i)) : el('p', {class: 'leeg'}, kort(GEKOZEN) + ': niets gepland.')), el('div', {class: 'ruimte'})];
+    lijst.map(i => itemRij(i)), jarig.map(j => jarigRij(j, GEKOZEN)),
+    lijst.length || jarig.length ? null : el('p', {class: 'leeg'}, kort(GEKOZEN) + ': niets gepland.')), el('div', {class: 'ruimte'})];
 }
 
 function maand() {
@@ -32,11 +38,13 @@ function maand() {
   for (let d = 1; d <= dagen; d++) {
     const iso = naarIso(new Date(J, m, d)), lijst = opDag(ITEMS, iso);
     const vak = lijst.some(i => isRol(i.soort, 'vakantie'));
-    const chips = lijst.filter(i => !isRol(i.soort, 'vakantie')).slice(0, 3).map(i => el('span', {class: 'chipje ' + soortKlasse(i.soort)}, i.titel.replace(/^Wereldshot: /, '')));
+    const jarig = jarigOp(JARIG, iso);
+    const chips = lijst.filter(i => !isRol(i.soort, 'vakantie')).slice(0, 3).map(i => el('span', {class: 'chipje ' + soortKlasse(i.soort)}, i.titel.replace(/^Wereldshot: /, '')))
+      .concat(jarig.slice(0, 2).map(j => el('span', {class: 'chipje jarig'}, '\u{1F382} ' + j.naam)));
     rij.append(el('td', {}, el('button', {
       class: [vak ? soortKlasse(metRol('vakantie')) : '', iso === v ? 'vandaag' : '', iso < v ? 'voorbij' : ''].join(' '),
       'aria-pressed': GEKOZEN === iso ? 'true' : 'false',
-      'aria-label': kort(iso) + (lijst.length ? ': ' + lijst.map(i => i.titel).join(', ') : ''),
+      'aria-label': kort(iso) + (lijst.length || jarig.length ? ': ' + lijst.map(i => i.titel).concat(jarig.map(j => 'jarig: ' + j.naam)).join(', ') : ''),
       onclick: () => { const y = scrollY; GEKOZEN = iso; teken(); scrollTo(0, y); }
     }, el('span', {class: 'nr'}, String(d)), chips)));
     if ((start + d) % 7 === 0) { tbody.append(rij); rij = el('tr'); }
@@ -101,19 +109,45 @@ function lijst() {
   return delen;
 }
 
+function jarig() {
+  const v = vandaagIso(), maand = naarIso(new Date(Date.now() + 30 * 864e5));
+  const komend = JARIG.map(j => [j, volgendeVerjaardag(j.dag)]).filter(([, iso]) => iso <= maand).sort((a, b) => a[1] < b[1] ? -1 : 1);
+  const knop = JARIG_SLEUTEL ? el('button', {type: 'button', class: 'knoplink klein', onclick: () => openAbo('jarig')}, 'Verjaardagen in mijn agenda') : null;
+  const perMaand = [];
+  for (let m = 0; m < 12; m++) {
+    const inM = JARIG.filter(j => Number(j.dag.slice(0, 2)) === m + 1);
+    if (!inM.length) continue;
+    perMaand.push(el('h2', {class: 'maand'}, MAANDEN[m]), el('div', {class: 'kaart'}, inM.map(j => jarigRij(j, volgendeVerjaardag(j.dag)))));
+  }
+  return [el('div', {style: 'display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 4px 10px'},
+      el('p', {class: 'meta', style: 'margin:0'}, 'Wie er de komende 30 dagen jarig is, en daaronder iedereen per maand.'), knop),
+    el('div', {class: 'kaart'}, komend.length ? komend.map(([j, iso]) => jarigRij(j, iso)) : el('p', {class: 'leeg'}, 'De komende 30 dagen is niemand jarig.')),
+    el('details', {class: 'geweest jaar'}, el('summary', {}, 'Alle verjaardagen (' + JARIG.length + ')'), perMaand)];
+}
+
+const TABS = ['binnenkort', 'maand', 'jaar', 'lijst', 'jarig'];
 function teken() {
-  for (const t of ['binnenkort', 'maand', 'jaar', 'lijst']) document.getElementById('tab-' + t).setAttribute('aria-selected', String(t === TAB));
-  inhoud.replaceChildren(...[].concat(TAB === 'binnenkort' ? binnenkort() : TAB === 'maand' ? maand() : TAB === 'jaar' ? jaar() : lijst()).filter(Boolean));
+  if (TAB === 'jarig' && !JARIG.length) TAB = 'binnenkort';
+  for (const t of TABS) document.getElementById('tab-' + t).setAttribute('aria-selected', String(t === TAB));
+  inhoud.replaceChildren(...[].concat({binnenkort, maand, jaar, lijst, jarig}[TAB]()).filter(Boolean));
   try { localStorage.setItem('kk-tab', TAB); } catch (e) {}
 }
 
-for (const t of ['binnenkort', 'maand', 'jaar', 'lijst']) document.getElementById('tab-' + t).onclick = () => { TAB = t; GEKOZEN = null; teken(); };
+for (const t of TABS) document.getElementById('tab-' + t).onclick = () => { TAB = t; GEKOZEN = null; teken(); };
 try { TAB = localStorage.getItem('kk-tab') || TAB; } catch (e) {}
 
 
 let NAAM_KOOR = '';
-function zetAbonnement(sleutel) {
-  const https = new URL(apiUrl('actie=ics&sleutel=' + sleutel), location.href).href, webcal = https.replace(/^https?:/, 'webcal:');
+const ABO_TEKST = {
+  ics: ['In je eigen agenda', 'Met een abonnement staat de planning in de agenda op je telefoon of computer en werkt hij zichzelf bij. Repetities in vakanties staan er niet in. Deel deze link alleen met leden.'],
+  jarig: ['Verjaardagen in je agenda', 'Een aparte agenda met alle verjaardagen, die zichzelf bijwerkt. Je kunt hem los van de planning aan- en uitzetten. Deel deze link alleen met leden.']
+};
+function openAbo(soort) {
+  const sleutel = soort === 'jarig' ? JARIG_SLEUTEL : ICS_SLEUTEL;
+  document.getElementById('abo-titel').textContent = ABO_TEKST[soort][0];
+  document.getElementById('abo-tekst').textContent = ABO_TEKST[soort][1];
+  document.getElementById('abo-melding').classList.add('verborgen');
+  const https = new URL(apiUrl('actie=' + soort + '&sleutel=' + sleutel), location.href).href, webcal = https.replace(/^https?:/, 'webcal:');
   document.getElementById('abo-webcal').href = webcal;
   document.getElementById('abo-google').href = 'https://calendar.google.com/calendar/render?cid=' + encodeURIComponent(webcal);
   document.getElementById('abo-kopie').onclick = async () => {
@@ -122,9 +156,13 @@ function zetAbonnement(sleutel) {
     catch (e) { m.textContent = https; }
     m.classList.remove('verborgen');
   };
+  document.getElementById('dlg-abo').showModal();
+}
+function zetAbonnement(sleutel) {
+  ICS_SLEUTEL = sleutel;
   const knop = document.getElementById('abonneer');
   knop.classList.remove('verborgen');
-  knop.onclick = () => document.getElementById('dlg-abo').showModal();
+  knop.onclick = () => openAbo('ics');
 }
 function start() {
   haalLijst().then(d => {
@@ -132,6 +170,8 @@ function start() {
   NAAM_KOOR = d.naam || '';
   if (!FILTER) FILTER = new Set(SOORTEN.filter(s => !isRol(s, 'wekelijks')));
   if (d.ics) zetAbonnement(d.ics);
+  JARIG = Array.isArray(d.verjaardagen) ? d.verjaardagen : []; JARIG_SLEUTEL = d.jarig || '';
+  document.getElementById('tab-jarig').classList.toggle('verborgen', !JARIG.length);
   if (d.naam) { document.getElementById('naam').textContent = 'Jaarplanning ' + d.naam; document.title = 'Jaarplanning ' + d.naam; }
   teken();
 }).catch(e => e.afgeschermd ? vraagLedencode(inhoud, start) : inhoud.replaceChildren(el('p', {class: 'melding'}, 'De planning kon niet geladen worden. Probeer het later opnieuw.')));
