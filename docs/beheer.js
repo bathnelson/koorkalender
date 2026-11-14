@@ -109,7 +109,7 @@ zetSoortKeuzes();
 async function laad() {
   const lijstData = await api('lijst'); zetSoorten(lijstData.soorten, lijstData.programma); zetSoortKeuzes(); ITEMS = lijstData.items || []; tekenLijst();
   JARIG = lijstData.verjaardagen || []; tekenJarig();
-  toonJarigLink().catch(e => zeg('Verjaardagen ophalen lukte niet: ' + e.message));
+  toonJarigLink().catch(() => {}); // oudere api.php zonder verjaardagen: blok blijft verborgen
   api('leden_link', {}).then(toonLeden).catch(e => zeg('Ledenlink ophalen lukte niet: ' + e.message));
   api('ics_link', {}).then(d => toonIcs(d.sleutel)).catch(e => fout('icsfout', 'Agendalink maken lukte niet: ' + e.message));
   // Schoolvakanties van dit en volgend schooljaar automatisch ophalen (eenmalig per schooljaar)
