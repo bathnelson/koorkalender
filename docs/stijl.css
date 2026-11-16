@@ -132,3 +132,13 @@ details.programma li{margin:2px 0}
 .chip.jarig{background:var(--jarig);color:var(--jarig-tekst);font-weight:600}
 .groot .chipje.jarig{background:var(--jarig);color:var(--jarig-tekst);font-weight:600}
 .kaart>.item.jarig:first-child{border-top-left-radius:11px;border-top-right-radius:11px}.kaart>.item.jarig:last-child{border-bottom-left-radius:11px;border-bottom-right-radius:11px}
+/* Ronddraaiend stippellijntje om de datum van een verjaardag */
+@property --jarig-hoek{syntax:'<angle>';inherits:false;initial-value:0deg}
+.item.jarig .dag{position:relative}
+.item.jarig .dag::after{content:'';position:absolute;inset:-4px;border-radius:13px;padding:2px;pointer-events:none;
+  background:repeating-conic-gradient(from var(--jarig-hoek),#ff4f9a 0 9deg,transparent 9deg 18deg,#ff9f1c 18deg 27deg,transparent 27deg 36deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  animation:jarig-draai 6s linear infinite}
+@keyframes jarig-draai{to{--jarig-hoek:360deg}}
+@media (prefers-reduced-motion:reduce){.item.jarig .dag::after{animation:none}}
