@@ -185,7 +185,7 @@ function volgendeVerjaardag(dag) {
 const dagTekst = dag => { const [m, d] = dag.split('-').map(Number); return d + ' ' + MAANDEN[m - 1]; };
 function jarigRij(v, iso, extra) {
   const d = naarDatum(iso), vandaag = iso === vandaagIso();
-  return el('div', {class: 'item jarig'},
+  return el('div', {class: 'item jarig jm' + Number(v.dag.slice(0, 2))},
     el('div', {class: 'dag'}, el('span', {}, DAGEN[d.getDay()]), el('b', {}, String(d.getDate())), el('span', {}, MND[d.getMonth()])),
     el('div', {class: 'info'}, el('div', {class: 'titel'}, '\u{1F382} ' + v.naam), el('span', {class: 'chip jarig'}, vandaag ? 'Vandaag jarig! \u{1F389}' : 'Jarig')),
     extra || null);

@@ -40,7 +40,7 @@ function maand() {
     const vak = lijst.some(i => isRol(i.soort, 'vakantie'));
     const jarig = jarigOp(JARIG, iso);
     const chips = lijst.filter(i => !isRol(i.soort, 'vakantie')).slice(0, 3).map(i => el('span', {class: 'chipje ' + soortKlasse(i.soort)}, i.titel.replace(/^Wereldshot: /, '')))
-      .concat(jarig.slice(0, 2).map(j => el('span', {class: 'chipje jarig'}, '\u{1F382} ' + j.naam)));
+      .concat(jarig.slice(0, 2).map(j => el('span', {class: 'chipje jarig jm' + Number(j.dag.slice(0, 2))}, '\u{1F382} ' + j.naam)));
     rij.append(el('td', {}, el('button', {
       class: [vak ? soortKlasse(metRol('vakantie')) : '', iso === v ? 'vandaag' : '', iso < v ? 'voorbij' : ''].join(' '),
       'aria-pressed': GEKOZEN === iso ? 'true' : 'false',

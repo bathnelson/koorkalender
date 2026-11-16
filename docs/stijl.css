@@ -123,9 +123,6 @@ details.programma li{margin:2px 0}
 .tabs button{flex:1 1 auto;min-width:0;padding:8px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:420px){.tabs button{font-size:.88rem}}@media (max-width:350px){.tabs{gap:2px}.tabs button{font-size:.8rem;padding:8px 2px}}
 /* Verjaardagen: vrolijk roze-oranje */
-:root{--jarig:linear-gradient(135deg,#ff9ac8,#ffc46b);--jarig-zacht:linear-gradient(135deg,#ffe0ef,#fff0d2);--jarig-tekst:#3a1022}
-:root[data-theme="dark"]{--jarig:linear-gradient(135deg,#a8336b,#a8661b);--jarig-zacht:linear-gradient(135deg,#4a2236,#4a3518);--jarig-tekst:#fff}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--jarig:linear-gradient(135deg,#a8336b,#a8661b);--jarig-zacht:linear-gradient(135deg,#4a2236,#4a3518);--jarig-tekst:#fff}}
 .item.jarig{background:var(--jarig-zacht)}
 .item.jarig .dag{background:var(--jarig);color:var(--jarig-tekst)}
 .item.jarig .dag span{color:inherit;opacity:.8}
@@ -136,9 +133,25 @@ details.programma li{margin:2px 0}
 @property --jarig-hoek{syntax:'<angle>';inherits:false;initial-value:0deg}
 .item.jarig .dag{position:relative}
 .item.jarig .dag::after{content:'';position:absolute;inset:-4px;border-radius:13px;padding:2px;pointer-events:none;
-  background:repeating-conic-gradient(from var(--jarig-hoek),#ff4f9a 0 9deg,transparent 9deg 18deg,#ff9f1c 18deg 27deg,transparent 27deg 36deg);
+  background:repeating-conic-gradient(from var(--jarig-hoek),var(--ja) 0 9deg,transparent 9deg 18deg,var(--jb) 18deg 27deg,transparent 27deg 36deg);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
   animation:jarig-draai 6s linear infinite}
 @keyframes jarig-draai{to{--jarig-hoek:360deg}}
 @media (prefers-reduced-motion:reduce){.item.jarig .dag::after{animation:none}}
+/* Verjaardagen: elke maand eigen seizoenskleuren (--ja, --jb) */
+.jm1{--ja:#5aa9ff;--jb:#b39dff}
+.jm2{--ja:#a46bff;--jb:#ff6fb5}
+.jm3{--ja:#9b6bff;--jb:#6cc94a}
+.jm4{--ja:#ff4d64;--jb:#ffcc1f}
+.jm5{--ja:#ff7fbf;--jb:#46c97f}
+.jm6{--ja:#ffc21f;--jb:#3fb8ff}
+.jm7{--ja:#ff9414;--jb:#16adc2}
+.jm8{--ja:#ffb800;--jb:#ff6233}
+.jm9{--ja:#e04a33;--jb:#d39a22}
+.jm10{--ja:#ff7014;--jb:#a85a22}
+.jm11{--ja:#bd3a63;--jb:#cf9a1e}
+.jm12{--ja:#e2323f;--jb:#1f9653}
+.item.jarig,.chipje.jarig{--jarig:linear-gradient(135deg,color-mix(in srgb,var(--ja) 55%,#fff),color-mix(in srgb,var(--jb) 55%,#fff));--jarig-zacht:linear-gradient(135deg,color-mix(in srgb,var(--ja) 16%,#fff),color-mix(in srgb,var(--jb) 16%,#fff));--jarig-tekst:#2a1018}
+:root[data-theme="dark"] :is(.item.jarig,.chipje.jarig){--jarig:linear-gradient(135deg,color-mix(in srgb,var(--ja) 55%,#1b1b1b),color-mix(in srgb,var(--jb) 55%,#1b1b1b));--jarig-zacht:linear-gradient(135deg,color-mix(in srgb,var(--ja) 22%,#1f1f23),color-mix(in srgb,var(--jb) 22%,#1f1f23));--jarig-tekst:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.item.jarig,.chipje.jarig){--jarig:linear-gradient(135deg,color-mix(in srgb,var(--ja) 55%,#1b1b1b),color-mix(in srgb,var(--jb) 55%,#1b1b1b));--jarig-zacht:linear-gradient(135deg,color-mix(in srgb,var(--ja) 22%,#1f1f23),color-mix(in srgb,var(--jb) 22%,#1f1f23));--jarig-tekst:#fff}}
