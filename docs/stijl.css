@@ -119,10 +119,16 @@ details.programma{margin-top:6px;font-size:.92rem}
 details.programma>summary{cursor:pointer;color:var(--accent);font-weight:600}
 details.programma ol{margin:6px 0 2px;padding-left:1.6em}
 details.programma li{margin:2px 0}
-.item.jarig .dag{background:#fde2ef}
-:root[data-theme="dark"] .item.jarig .dag{background:#5a2a40}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .item.jarig .dag{background:#5a2a40}}
-.groot .chipje.jarig{background:transparent;padding-left:0}
 .knoplink.klein{min-height:34px;padding:4px 12px;font-size:.9rem}
 .tabs button{flex:1 1 auto;min-width:0;padding:8px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:420px){.tabs button{font-size:.88rem}}@media (max-width:350px){.tabs{gap:2px}.tabs button{font-size:.8rem;padding:8px 2px}}
+/* Verjaardagen: vrolijk roze-oranje */
+:root{--jarig:linear-gradient(135deg,#ff9ac8,#ffc46b);--jarig-zacht:linear-gradient(135deg,#ffe0ef,#fff0d2);--jarig-tekst:#3a1022}
+:root[data-theme="dark"]{--jarig:linear-gradient(135deg,#a8336b,#a8661b);--jarig-zacht:linear-gradient(135deg,#4a2236,#4a3518);--jarig-tekst:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--jarig:linear-gradient(135deg,#a8336b,#a8661b);--jarig-zacht:linear-gradient(135deg,#4a2236,#4a3518);--jarig-tekst:#fff}}
+.item.jarig{background:var(--jarig-zacht)}
+.item.jarig .dag{background:var(--jarig);color:var(--jarig-tekst)}
+.item.jarig .dag span{color:inherit;opacity:.8}
+.chip.jarig{background:var(--jarig);color:var(--jarig-tekst);font-weight:600}
+.groot .chipje.jarig{background:var(--jarig);color:var(--jarig-tekst);font-weight:600}
+.kaart>.item.jarig:first-child{border-top-left-radius:11px;border-top-right-radius:11px}.kaart>.item.jarig:last-child{border-bottom-left-radius:11px;border-bottom-right-radius:11px}

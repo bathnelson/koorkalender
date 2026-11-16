@@ -187,6 +187,6 @@ function jarigRij(v, iso, extra) {
   const d = naarDatum(iso), vandaag = iso === vandaagIso();
   return el('div', {class: 'item jarig'},
     el('div', {class: 'dag'}, el('span', {}, DAGEN[d.getDay()]), el('b', {}, String(d.getDate())), el('span', {}, MND[d.getMonth()])),
-    el('div', {class: 'info'}, el('div', {class: 'titel'}, '\u{1F382} ' + v.naam), el('div', {class: 'meta'}, vandaag ? 'Vandaag jarig!' : 'Jarig')),
+    el('div', {class: 'info'}, el('div', {class: 'titel'}, '\u{1F382} ' + v.naam), el('span', {class: 'chip jarig'}, vandaag ? 'Vandaag jarig! \u{1F389}' : 'Jarig')),
     extra || null);
 }

@@ -305,6 +305,7 @@ function verjaardagenIcs(array $lijst, array $cfg): void {
         $r[] = $v['dag'] === '02-29' ? 'RRULE:FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=-1' : 'RRULE:FREQ=YEARLY';
         $r[] = 'SUMMARY:' . icsTekst(zonderLinks(($voor !== '' ? "[$voor] " : '') . 'Jarig: ' . $v['naam']));
         $r[] = 'CATEGORIES:Verjaardag';
+        $r[] = 'COLOR:hotpink';
         $r[] = 'TRANSP:TRANSPARENT';
         $r[] = 'END:VEVENT';
     }
