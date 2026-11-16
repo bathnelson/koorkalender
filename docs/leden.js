@@ -122,7 +122,7 @@ function jarig() {
   return [el('div', {style: 'display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 4px 10px'},
       el('p', {class: 'meta', style: 'margin:0'}, 'Wie er de komende 30 dagen jarig is, en daaronder iedereen per maand.'), knop),
     el('div', {class: 'kaart'}, komend.length ? komend.map(([j, iso]) => jarigRij(j, iso)) : el('p', {class: 'leeg'}, 'De komende 30 dagen is niemand jarig.')),
-    el('details', {class: 'geweest jaar'}, el('summary', {}, 'Alle verjaardagen (' + JARIG.length + ')'), perMaand)];
+    el('details', {class: 'geweest jaarblok'}, el('summary', {}, 'Alle verjaardagen (' + JARIG.length + ')'), perMaand)];
 }
 
 const TABS = ['binnenkort', 'maand', 'jaar', 'lijst', 'jarig'];

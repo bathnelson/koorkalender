@@ -167,7 +167,7 @@ function maandLijst(items, rij, jaar) {
   for (const j of jaren) {
     const inJ = komend.filter(i => Math.max(ditJaar, Number(i.datum.slice(0, 4))) === j);
     if (j === ditJaar) delen.push(el('h2', {class: 'jaarkop'}, String(j)), ...blokken(inJ));
-    else delen.push(el('details', {class: 'geweest jaar'}, el('summary', {}, String(j) + ' (' + inJ.length + ')'), blokken(inJ)));
+    else delen.push(el('details', {class: 'geweest jaarblok'}, el('summary', {}, String(j) + ' (' + inJ.length + ')'), blokken(inJ)));
   }
   return delen;
 }
