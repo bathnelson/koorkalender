@@ -57,8 +57,8 @@ $('form').addEventListener('submit', async e => {
   try { const d = await api('opslaan', {item}); ITEMS = d.items; JAAR = Number(d.item.datum.slice(0, 4)); tekenLijst(); $('dlg').close(); zeg('Opgeslagen: ' + d.item.titel + ' (' + kort(d.item.datum) + ').'); }
   catch (err) { fout('dlgfout', err.message); }
 });
-// Het programma-veld alleen bij optredens tonen (of als er al liedjes in staan)
-function toonLiedjesVeld() { $('v-liedjes').classList.toggle('verborgen', !(PROGRAMMA && (isRol($('f-soort').value, 'hoogtepunt') || isRol($('f-soort').value, 'voorbehoud'))) && !$('f-liedjes').value.trim()); }
+// Het programma-veld bij elke soort tonen (ook repetities), tenzij het programma in de instellingen uit staat
+function toonLiedjesVeld() { $('v-liedjes').classList.toggle('verborgen', !PROGRAMMA && !$('f-liedjes').value.trim()); }
 $('f-soort').addEventListener('change', toonLiedjesVeld);
 $('f-annuleer').onclick = () => $('dlg').close();
 $('nieuw').onclick = () => bewerk(null);
