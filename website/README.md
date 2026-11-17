@@ -18,6 +18,10 @@ Een kleine website in PHP, zonder database. Draait op gewone webhosting (bijvoor
    - Nextcloud: adres, gebruiker, app-wachtwoord en de map die leden mogen zien
 4. Ga naar `/beheer`, log in en pas de standaardpagina's aan.
 
+## Uploadlimiet voor foto's
+
+Grote foto's worden in de browser al verkleind tot maximaal 1600 pixels voordat ze worden geüpload. Geeft de host toch een melding dat een foto te groot is, dan staat de limiet van PHP te laag. Het bestand `.user.ini` in deze map zet hem op 10 MB. Werkt dat niet, zet dan in DirectAdmin bij *PHP-instellingen* (of *Select PHP version > Options*) `upload_max_filesize` op `10M` en `post_max_size` op `12M`.
+
 ## Nextcloud koppelen
 
 1. Maak in Nextcloud bij voorkeur een apart account, bijvoorbeeld `website`.
