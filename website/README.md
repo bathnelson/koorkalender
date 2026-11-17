@@ -38,7 +38,9 @@ Leden loggen in met hun eigen Nextcloud-account, gewoon op de ledenpagina. Zet d
 - **Gebruikersnaam en wachtwoord**: de website vraagt daarmee bij Nextcloud een app-wachtwoord aan voor deze sessie. Het wachtwoord zelf wordt niet bewaard; het app-wachtwoord blijft alleen op de server en wordt bij uitloggen ingetrokken.
 - **Tweestapsverificatie**: wie dat aan heeft, klikt op *Inloggen via Nextcloud*. Er opent dan een venster van Nextcloud zelf (Login Flow); daarna gaat de website vanzelf verder. Een eigen app-wachtwoord intypen werkt ook.
 
-**Bestanden**: wie met Nextcloud is ingelogd, ziet de map `nextcloud_map` (bijvoorbeeld `Leden`) uit zijn of haar eigen Nextcloud, met precies de rechten die hij of zij daar heeft. Deel de ledenmap daarom met de groep, of gebruik een teamfolder, zodat hij bij iedereen onder dezelfde naam staat. Het website-account (`nextcloud_gebruiker`) is dan alleen nog nodig voor wie met het gezamenlijke ledenwachtwoord inlogt.
+**Bestanden**: wie met Nextcloud is ingelogd, ziet de map `nextcloud_map` (bijvoorbeeld `Leden`) uit zijn of haar eigen Nextcloud, met precies de rechten die hij of zij daar heeft. Deel de ledenmap daarom met de groep, of gebruik een teamfolder, zodat hij bij iedereen onder dezelfde naam staat.
+
+Gebruiken jullie teammappen, zet `nextcloud_map` dan op `''` en `nextcloud_alleen_teammappen` op `true`. Een lid ziet dan bovenaan precies de teammappen waar hij of zij in Nextcloud recht op heeft, en niet de eigen mappen zoals Documents of Photos. Het website-account (`nextcloud_gebruiker`) is dan alleen nog nodig voor wie met het gezamenlijke ledenwachtwoord inlogt.
 
 Let op: sluit een lid de browser zonder uit te loggen, dan blijft het app-wachtwoord in Nextcloud staan (Instellingen > Beveiliging > Apparaten & sessies, naam "Website Wereldkoor Haarlem"). Dat kan geen kwaad en het lid kan het daar weghalen. Logt een lid vaak met een verkeerd wachtwoord in, dan kan de beveiliging van Nextcloud het inloggen via de website tijdelijk vertragen.
 
