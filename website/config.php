@@ -1,0 +1,40 @@
+<?php
+// Instellingen voor de website. Pas alleen de waarden tussen de aanhalingstekens aan.
+// Zet de echte wachtwoorden alleen op de host, nooit in git.
+return [
+    // Naam van het koor, bovenaan elke pagina
+    'naam' => 'Wereldkoor Haarlem',
+
+    // Korte zin onder de naam
+    'ondertitel' => 'Liederen uit de hele wereld',
+
+    // Wachtwoord voor de beheerpagina (/beheer). Zolang hier 'verander-mij' staat, kan niemand inloggen.
+    // Mag ook een hash zijn die begint met $2y$ (gemaakt met password_hash).
+    'beheer_wachtwoord' => 'verander-mij',
+
+    // Wachtwoord voor het ledengedeelte (/leden). Eén gezamenlijk wachtwoord voor alle leden.
+    // Zolang hier 'verander-mij' staat, kan niemand inloggen.
+    'leden_wachtwoord' => 'verander-mij',
+
+    // ---- Jaarkalender (de koorkalender op dezelfde host) ----
+
+    // Pad naar planning.json van de koorkalender, gezien vanaf deze map.
+    // Hieruit komt de openbare concertagenda (alleen afspraken van de soort 'Optreden').
+    // Leeg laten = geen concertagenda.
+    'kalender_data' => __DIR__ . '/../kalender/data/planning.json',
+
+    // Adres van de jaarkalender voor leden. Gebruik de geheime ledenlink van de beheerpagina van de kalender
+    // als die is afgeschermd. Wordt in het ledengedeelte getoond.
+    'kalender_url' => '/kalender/',
+
+    // ---- Nextcloud (bestanden voor leden, alleen lezen) ----
+
+    // Adres van jullie Nextcloud, zonder / aan het eind. Leeg laten = geen bestanden in het ledengedeelte.
+    'nextcloud_url' => '',
+    // Gebruikersnaam van het account waarmee de website meekijkt (liefst een apart account, bijv. 'website')
+    'nextcloud_gebruiker' => '',
+    // App-wachtwoord van dat account (Nextcloud > Instellingen > Beveiliging > Nieuw app-wachtwoord)
+    'nextcloud_app_wachtwoord' => '',
+    // Map in dat account die leden mogen zien, bijvoorbeeld 'Koor/Leden'. Alles daarbuiten blijft onzichtbaar.
+    'nextcloud_map' => 'Leden',
+];

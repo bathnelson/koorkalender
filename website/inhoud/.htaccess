@@ -1,0 +1,4 @@
+# Foto's mogen getoond worden, maar er wordt hier nooit code uitgevoerd
+<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh|html?)$">
+    Require all denied
+</FilesMatch>

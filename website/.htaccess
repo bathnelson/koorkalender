@@ -1,0 +1,12 @@
+Options -Indexes
+DirectoryIndex index.php
+
+# Instellingen, code en de opslag van de pagina's zijn niet los op te vragen
+<FilesMatch "^(config|lib|leden|beheer)\.php$|\.(json|lock|md)$">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+# Bestaande bestanden (opmaak, foto's) gewoon tonen, al het andere naar index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L,QSA]
