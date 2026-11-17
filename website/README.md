@@ -33,14 +33,14 @@ Wat in die map komt, staat meteen in het ledengedeelte. Bestanden toevoegen doe 
 
 ## Inloggen met Nextcloud
 
-Leden kunnen inloggen met hun eigen Nextcloud-account in plaats van met het gezamenlijke ledenwachtwoord. Dit gebruikt *Login Flow*, de manier waarop ook de Nextcloud-apps inloggen. Dat zit in elke Nextcloud, ook bij Hetzner Storage Share, en er hoeft in Nextcloud niets voor ingesteld te worden.
+Leden loggen in met hun eigen Nextcloud-account, gewoon op de ledenpagina. Zet daarvoor in `config.php` `nextcloud_login` op `true` en vul `nextcloud_url` in. Wil je alleen een bepaalde groep toelaten, zet de groeps-ID bij `nextcloud_groep` (hoofdlettergevoelig).
 
-1. Zet in `config.php` `nextcloud_login` op `true` (en vul `nextcloud_url` in).
-2. Wil je alleen een bepaalde groep toelaten, zet de groepsnaam bij `nextcloud_groep`.
+- **Gebruikersnaam en wachtwoord**: de website vraagt daarmee bij Nextcloud een app-wachtwoord aan voor deze sessie. Het wachtwoord zelf wordt niet bewaard; het app-wachtwoord blijft alleen op de server en wordt bij uitloggen ingetrokken.
+- **Tweestapsverificatie**: wie dat aan heeft, klikt op *Inloggen via Nextcloud*. Er opent dan een venster van Nextcloud zelf (Login Flow); daarna gaat de website vanzelf verder. Een eigen app-wachtwoord intypen werkt ook.
 
-Op de inlogpagina staat dan de knop *Inloggen met Nextcloud*. Er opent een venster van Nextcloud zelf; het lid logt daar in en klikt op *Toegang verlenen*. De website gaat daarna vanzelf verder. Het wachtwoord komt dus nooit langs de website, en tweestapsverificatie werkt gewoon. De website trekt het tijdelijke app-wachtwoord dat Nextcloud daarbij maakt meteen weer in.
+**Bestanden**: wie met Nextcloud is ingelogd, ziet de map `nextcloud_map` (bijvoorbeeld `Leden`) uit zijn of haar eigen Nextcloud, met precies de rechten die hij of zij daar heeft. Deel de ledenmap daarom met de groep, of gebruik een teamfolder, zodat hij bij iedereen onder dezelfde naam staat. Het website-account (`nextcloud_gebruiker`) is dan alleen nog nodig voor wie met het gezamenlijke ledenwachtwoord inlogt.
 
-Laat je `leden_wachtwoord` op `verander-mij` staan, dan is Nextcloud de enige manier om in te loggen. De bestanden in het ledengedeelte komen nog steeds via het website-account (zie hierboven), zodat iedereen dezelfde ledenmap ziet.
+Let op: sluit een lid de browser zonder uit te loggen, dan blijft het app-wachtwoord in Nextcloud staan (Instellingen > Beveiliging > Apparaten & sessies, naam "Website Wereldkoor Haarlem"). Dat kan geen kwaad en het lid kan het daar weghalen. Logt een lid vaak met een verkeerd wachtwoord in, dan kan de beveiliging van Nextcloud het inloggen via de website tijdelijk vertragen.
 
 ## Tekst opmaken
 

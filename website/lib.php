@@ -60,7 +60,12 @@ function probeerLogin(string $rol, array $cfg): ?string {
 }
 
 function uitloggen(): void {
+    global $CONFIG;
     startSessie();
+    // Het app-wachtwoord dat bij het inloggen met Nextcloud is gemaakt weer intrekken
+    if (!empty($_SESSION['nc_login']) && !empty($_SESSION['nc_app']) && empty($_SESSION['nc_eigen_app']) && ($CONFIG['nextcloud_url'] ?? '') !== '') {
+        ncHttp('DELETE', rtrim($CONFIG['nextcloud_url'], '/') . '/ocs/v2.php/core/apppassword', ['OCS-APIRequest: true'], null, $_SESSION['nc_login'] . ':' . $_SESSION['nc_app']);
+    }
     $_SESSION = [];
     session_destroy();
 }
@@ -282,9 +287,21 @@ function concertenHtml(array $cfg): string {
 
 // ---------- Nextcloud (alleen lezen, via WebDAV) ----------
 
-function ncAan(array $cfg): bool {
-    return ($cfg['nextcloud_url'] ?? '') !== '' && ($cfg['nextcloud_gebruiker'] ?? '') !== '' && ($cfg['nextcloud_app_wachtwoord'] ?? '') !== '';
+// Met welk account worden de bestanden opgehaald? Is het lid met Nextcloud ingelogd, dan met zijn of haar eigen account
+// (het lid ziet dan precies wat het in Nextcloud ook mag zien). Anders met het website-account uit config.php.
+// Geeft [gebruikers-id voor het pad, inlognaam, app-wachtwoord] of null.
+function ncAccount(array $cfg): ?array {
+    if (($cfg['nextcloud_url'] ?? '') === '') return null;
+    if (!empty($_SESSION['nc_id']) && !empty($_SESSION['nc_app'])) {
+        return [(string)$_SESSION['nc_id'], (string)$_SESSION['nc_login'], (string)$_SESSION['nc_app']];
+    }
+    if (($cfg['nextcloud_gebruiker'] ?? '') !== '' && ($cfg['nextcloud_app_wachtwoord'] ?? '') !== '') {
+        return [(string)$cfg['nextcloud_gebruiker'], (string)$cfg['nextcloud_gebruiker'], (string)$cfg['nextcloud_app_wachtwoord']];
+    }
+    return null;
 }
+
+function ncAan(array $cfg): bool { return ncAccount($cfg) !== null; }
 
 // Maakt van een pad uit de adresbalk een veilig pad binnen de ledenmap. Geeft null bij iets vreemds.
 function ncSchoonPad(string $pad): ?string {
@@ -298,7 +315,7 @@ function ncSchoonPad(string $pad): ?string {
 }
 
 function ncAdres(array $cfg, string $pad): string {
-    $basis = rtrim($cfg['nextcloud_url'], '/') . '/remote.php/dav/files/' . rawurlencode($cfg['nextcloud_gebruiker']) . '/';
+    $basis = rtrim($cfg['nextcloud_url'], '/') . '/remote.php/dav/files/' . rawurlencode(ncAccount($cfg)[0]) . '/';
     $volledig = trim(trim((string)$cfg['nextcloud_map'], '/') . '/' . $pad, '/');
     return $basis . implode('/', array_map('rawurlencode', $volledig === '' ? [] : explode('/', $volledig)));
 }
@@ -306,7 +323,7 @@ function ncAdres(array $cfg, string $pad): string {
 function ncCurl(array $cfg, string $adres) {
     $c = curl_init($adres);
     curl_setopt_array($c, [
-        CURLOPT_USERPWD => $cfg['nextcloud_gebruiker'] . ':' . $cfg['nextcloud_app_wachtwoord'],
+        CURLOPT_USERPWD => ncAccount($cfg)[1] . ':' . ncAccount($cfg)[2],
         CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_FOLLOWLOCATION => false,
@@ -332,7 +349,7 @@ function ncLijst(array $cfg, string $pad) {
     curl_close($c);
     if ($antw === false || $code === 0) return 'Nextcloud is niet bereikbaar.';
     if ($code === 401) return 'De website kan niet inloggen bij Nextcloud. Controleer gebruiker en app-wachtwoord in config.php.';
-    if ($code === 404) return 'Deze map bestaat niet (meer).';
+    if ($code === 404) return $pad === '' ? 'De map "' . $cfg['nextcloud_map'] . '" staat niet in jouw Nextcloud. Vraag het bestuur om hem met je te delen.' : 'Deze map bestaat niet (meer).';
     if ($code !== 207) return 'Nextcloud gaf een onverwacht antwoord (' . $code . ').';
 
     $prev = libxml_use_internal_errors(true);
@@ -447,7 +464,54 @@ function ssoStart(array $cfg): ?string {
     return (string)$d['login'];
 }
 
-// Stap 3: geeft ['status' => 'wacht' | 'ok' | 'fout', 'melding' => ...]
+// Rondt het inloggen af met een inlognaam en app-wachtwoord van Nextcloud. Geeft null als het gelukt is, anders een foutmelding.
+// Het app-wachtwoord blijft in de sessie op de server (niet in de browser) en wordt bij uitloggen ingetrokken.
+// $eigen = true: het lid logde in met een eigen app-wachtwoord; dat wordt nooit door de website ingetrokken.
+function ssoVoltooi(array $cfg, string $loginNaam, string $appWachtwoord, bool $eigen = false): ?string {
+    $basis = rtrim($cfg['nextcloud_url'], '/');
+    $basic = $loginNaam . ':' . $appWachtwoord;
+    [$code, $antw] = ncHttp('GET', $basis . '/ocs/v2.php/cloud/user?format=json', ['OCS-APIRequest: true', 'Accept: application/json'], null, $basic);
+    $gebruiker = json_decode($antw, true)['ocs']['data'] ?? null;
+    $weg = function () use ($basis, $basic, $eigen) { if (!$eigen) ncHttp('DELETE', $basis . '/ocs/v2.php/core/apppassword', ['OCS-APIRequest: true'], null, $basic); };
+    if ($code !== 200 || !is_array($gebruiker) || empty($gebruiker['id'])) { $weg(); return $eigen ? 'Gebruikersnaam of wachtwoord klopt niet.' : 'Je gegevens konden niet worden opgehaald bij Nextcloud.'; }
+    $groep = (string)($cfg['nextcloud_groep'] ?? '');
+    if ($groep !== '' && !in_array($groep, (array)($gebruiker['groups'] ?? []), true)) {
+        $weg();
+        return 'Je bent ingelogd bij Nextcloud, maar je account hoort niet bij de groep "' . $groep . '". Vraag het bestuur om je toe te voegen.';
+    }
+    startSessie();
+    session_regenerate_id(true);
+    $_SESSION['leden'] = true;
+    $_SESSION['naam'] = (string)($gebruiker['displayname'] ?? $gebruiker['display-name'] ?? $gebruiker['id']);
+    $_SESSION['nc_id'] = (string)$gebruiker['id'];
+    $_SESSION['nc_login'] = $loginNaam;
+    $_SESSION['nc_app'] = $appWachtwoord;
+    if ($eigen) $_SESSION['nc_eigen_app'] = true;
+    return null;
+}
+
+// Inloggen met gebruikersnaam en wachtwoord op de website zelf. Het wachtwoord wordt alleen gebruikt om bij Nextcloud
+// een app-wachtwoord voor deze sessie aan te vragen en wordt nergens bewaard.
+function ssoFormulier(array $cfg, string $naam, string $wachtwoord): ?string {
+    $naam = trim($naam);
+    if ($naam === '' || $wachtwoord === '') return 'Vul je gebruikersnaam en wachtwoord in.';
+    $basis = rtrim($cfg['nextcloud_url'], '/');
+    [$code, $antw] = ncHttp('GET', $basis . '/ocs/v2.php/core/getapppassword?format=json', ['OCS-APIRequest: true', 'Accept: application/json'], null, $naam . ':' . $wachtwoord);
+    if ($code === 200) {
+        $app = (string)(json_decode($antw, true)['ocs']['data']['apppassword'] ?? '');
+        if ($app === '') return 'Nextcloud gaf een onverwacht antwoord.';
+        return ssoVoltooi($cfg, $naam, $app);
+    }
+    // 403: er werd al met een app-wachtwoord ingelogd; dat dan zelf gebruiken (wordt bij uitloggen niet ingetrokken)
+    if ($code === 403) {
+        return ssoVoltooi($cfg, $naam, $wachtwoord, true);
+    }
+    if ($code === 401) return 'Gebruikersnaam of wachtwoord klopt niet. Heb je tweestapsverificatie aan, gebruik dan de knop hieronder.';
+    if ($code === 0) return 'Nextcloud is niet bereikbaar. Probeer het later opnieuw.';
+    return 'Inloggen lukte niet (' . $code . ').';
+}
+
+// Login Flow (venster van Nextcloud, voor wie tweestapsverificatie aan heeft). Geeft ['status' => 'wacht' | 'ok' | 'fout', 'melding' => ...]
 function ssoCheck(array $cfg): array {
     startSessie();
     $token = (string)($_SESSION['sso_poll'] ?? '');
@@ -461,22 +525,8 @@ function ssoCheck(array $cfg): array {
     unset($_SESSION['sso_poll'], $_SESSION['sso_tijd']);
     $d = json_decode($antw, true);
     if ($code !== 200 || empty($d['loginName']) || empty($d['appPassword'])) return ['status' => 'fout', 'melding' => 'Nextcloud gaf een onverwacht antwoord (' . $code . ').'];
-    $basic = $d['loginName'] . ':' . $d['appPassword'];
-
-    [$code, $antw] = ncHttp('GET', $basis . '/ocs/v2.php/cloud/user?format=json', ['OCS-APIRequest: true', 'Accept: application/json'], null, $basic);
-    $gebruiker = json_decode($antw, true)['ocs']['data'] ?? null;
-    // Het tijdelijke app-wachtwoord meteen weer intrekken
-    ncHttp('DELETE', $basis . '/ocs/v2.php/core/apppassword', ['OCS-APIRequest: true'], null, $basic);
-
-    if ($code !== 200 || !is_array($gebruiker) || empty($gebruiker['id'])) return ['status' => 'fout', 'melding' => 'Je gegevens konden niet worden opgehaald bij Nextcloud.'];
-    $groep = (string)($cfg['nextcloud_groep'] ?? '');
-    if ($groep !== '' && !in_array($groep, (array)($gebruiker['groups'] ?? []), true)) {
-        return ['status' => 'fout', 'melding' => 'Je bent ingelogd bij Nextcloud, maar je account hoort niet bij de groep "' . $groep . '". Vraag het bestuur om je toe te voegen.'];
-    }
-    session_regenerate_id(true);
-    $_SESSION['leden'] = true;
-    $_SESSION['naam'] = (string)($gebruiker['displayname'] ?? $gebruiker['display-name'] ?? $gebruiker['id']);
-    return ['status' => 'ok'];
+    $fout = ssoVoltooi($cfg, (string)$d['loginName'], (string)$d['appPassword']);
+    return $fout === null ? ['status' => 'ok'] : ['status' => 'fout', 'melding' => $fout];
 }
 
 function grootte(int $b): string {
