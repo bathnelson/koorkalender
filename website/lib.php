@@ -506,7 +506,7 @@ function ssoFormulier(array $cfg, string $naam, string $wachtwoord): ?string {
     if ($code === 403) {
         return ssoVoltooi($cfg, $naam, $wachtwoord, true);
     }
-    if ($code === 401) return 'Gebruikersnaam of wachtwoord klopt niet. Heb je tweestapsverificatie aan, gebruik dan de knop hieronder.';
+    if ($code === 401) return 'Inloggen lukte niet. Controleer je gebruikersnaam (niet je e-mailadres) en wachtwoord, of gebruik de knop "Inloggen via Nextcloud" hieronder.';
     if ($code === 0) return 'Nextcloud is niet bereikbaar. Probeer het later opnieuw.';
     return 'Inloggen lukte niet (' . $code . ').';
 }
