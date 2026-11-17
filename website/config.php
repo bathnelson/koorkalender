@@ -37,11 +37,8 @@ return [
     // App-wachtwoord van dat account (Nextcloud > Instellingen > Beveiliging > Nieuw app-wachtwoord)
     'nextcloud_app_wachtwoord' => '',
     // ---- Inloggen met Nextcloud (leden loggen in met hun eigen Nextcloud-account) ----
-    // Maak in Nextcloud bij Beheer > Beveiliging > OAuth 2.0-clients een client aan met als
-    // doorstuur-URL het volledige adres van het ledengedeelte, bijvoorbeeld https://hansb.nl/wkh-website/leden
-    // en zet de Client-ID en het geheim hier. Leeg laten = geen Nextcloud-knop.
-    'nextcloud_client_id' => '',
-    'nextcloud_client_geheim' => '',
+    // true = op de ledenpagina staat de knop "Inloggen met Nextcloud". Er hoeft in Nextcloud niets ingesteld te worden.
+    'nextcloud_login' => false,
     // Alleen leden van deze Nextcloud-groep mogen erin (bijv. 'Wereldkoor'). Leeg = iedereen met een account.
     'nextcloud_groep' => '',
 

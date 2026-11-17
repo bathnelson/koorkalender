@@ -403,44 +403,32 @@ function ncDownload(array $cfg, string $pad): void {
     }
 }
 
-// ---------- Inloggen met Nextcloud (OAuth 2.0) ----------
+// ---------- Inloggen met Nextcloud (Login Flow v2, zit in elke Nextcloud) ----------
+//
+// 1. De website vraagt Nextcloud om een inlogpagina (login/v2) en opent die in een nieuw venster.
+// 2. Het lid logt daar in bij Nextcloud zelf (met tweestapsverificatie als die aan staat) en geeft toestemming.
+// 3. De website vraagt intussen steeds na of het gelukt is, controleert wie het is en in welke groepen,
+//    en trekt het tijdelijke app-wachtwoord daarna meteen weer in. Het wachtwoord van het lid komt nooit langs de website.
+
+const SSO_AGENT = 'Website Wereldkoor Haarlem';
 
 function ssoAan(array $cfg): bool {
-    return ($cfg['nextcloud_url'] ?? '') !== '' && ($cfg['nextcloud_client_id'] ?? '') !== '' && ($cfg['nextcloud_client_geheim'] ?? '') !== '';
+    return ($cfg['nextcloud_url'] ?? '') !== '' && !empty($cfg['nextcloud_login']);
 }
 
-function volledigeUrl(string $pad): string {
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
-    $host = preg_replace('/[^A-Za-z0-9.:\-\[\]]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
-    return ($https ? 'https' : 'http') . '://' . $host . $pad;
-}
-
-function ssoTerugAdres(): string { return volledigeUrl(url('leden')); }
-
-function ssoStart(array $cfg): void {
-    startSessie();
-    $_SESSION['sso_state'] = bin2hex(random_bytes(16));
-    $adres = rtrim($cfg['nextcloud_url'], '/') . '/index.php/apps/oauth2/authorize?' . http_build_query([
-        'response_type' => 'code',
-        'client_id' => $cfg['nextcloud_client_id'],
-        'redirect_uri' => ssoTerugAdres(),
-        'state' => $_SESSION['sso_state'],
-    ]);
-    header('Location: ' . $adres, true, 303);
-    exit;
-}
-
-function ncHttp(string $methode, string $adres, array $koppen = [], ?string $body = null): array {
+function ncHttp(string $methode, string $adres, array $koppen = [], ?string $body = null, ?string $basic = null): array {
     $c = curl_init($adres);
     curl_setopt_array($c, [
         CURLOPT_CUSTOMREQUEST => $methode,
         CURLOPT_HTTPHEADER => $koppen,
+        CURLOPT_USERAGENT => SSO_AGENT,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT => 20,
         CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
     ]);
+    if ($basic !== null) { curl_setopt($c, CURLOPT_USERPWD, $basic); curl_setopt($c, CURLOPT_HTTPAUTH, CURLAUTH_BASIC); }
     if ($body !== null) curl_setopt($c, CURLOPT_POSTFIELDS, $body);
     $antw = curl_exec($c);
     $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
@@ -448,48 +436,47 @@ function ncHttp(string $methode, string $adres, array $koppen = [], ?string $bod
     return [$code, $antw === false ? '' : (string)$antw];
 }
 
-// Verwerkt de terugkeer van Nextcloud. Geeft null als het gelukt is (de functie stuurt dan door), anders een foutmelding.
-function ssoTerug(array $cfg): ?string {
+// Stap 1: geeft het adres van de inlogpagina van Nextcloud, of null als Nextcloud niet reageert.
+function ssoStart(array $cfg): ?string {
     startSessie();
-    $state = (string)($_GET['state'] ?? '');
-    $verwacht = (string)($_SESSION['sso_state'] ?? '');
-    unset($_SESSION['sso_state']);
-    if ($verwacht === '' || !hash_equals($verwacht, $state)) return 'Het inloggen is verlopen. Probeer het opnieuw.';
-    if (isset($_GET['error'])) return 'Inloggen bij Nextcloud is afgebroken.';
+    [$code, $antw] = ncHttp('POST', rtrim($cfg['nextcloud_url'], '/') . '/index.php/login/v2', ['Accept: application/json']);
+    $d = json_decode($antw, true);
+    if ($code !== 200 || empty($d['login']) || empty($d['poll']['token'])) return null;
+    $_SESSION['sso_poll'] = (string)$d['poll']['token'];
+    $_SESSION['sso_tijd'] = time();
+    return (string)$d['login'];
+}
 
-    $basis = rtrim($cfg['nextcloud_url'], '/');
-    [$code, $antw] = ncHttp('POST', $basis . '/index.php/apps/oauth2/api/v1/token',
-        ['Content-Type: application/x-www-form-urlencoded', 'Accept: application/json'],
-        http_build_query([
-            'grant_type' => 'authorization_code',
-            'code' => (string)($_GET['code'] ?? ''),
-            'redirect_uri' => ssoTerugAdres(),
-            'client_id' => $cfg['nextcloud_client_id'],
-            'client_secret' => $cfg['nextcloud_client_geheim'],
-        ]));
-    $token = json_decode($antw, true);
-    if ($code !== 200 || !is_array($token) || empty($token['access_token'])) {
-        return 'Nextcloud gaf geen toegang (' . $code . '). Controleer Client-ID, geheim en doorstuur-URL in config.php.';
+// Stap 3: geeft ['status' => 'wacht' | 'ok' | 'fout', 'melding' => ...]
+function ssoCheck(array $cfg): array {
+    startSessie();
+    $token = (string)($_SESSION['sso_poll'] ?? '');
+    if ($token === '' || time() - (int)($_SESSION['sso_tijd'] ?? 0) > 1200) {
+        unset($_SESSION['sso_poll'], $_SESSION['sso_tijd']);
+        return ['status' => 'fout', 'melding' => 'Het inloggen is verlopen. Probeer het opnieuw.'];
     }
+    $basis = rtrim($cfg['nextcloud_url'], '/');
+    [$code, $antw] = ncHttp('POST', $basis . '/index.php/login/v2/poll', ['Content-Type: application/x-www-form-urlencoded', 'Accept: application/json'], http_build_query(['token' => $token]));
+    if ($code === 404) return ['status' => 'wacht'];
+    unset($_SESSION['sso_poll'], $_SESSION['sso_tijd']);
+    $d = json_decode($antw, true);
+    if ($code !== 200 || empty($d['loginName']) || empty($d['appPassword'])) return ['status' => 'fout', 'melding' => 'Nextcloud gaf een onverwacht antwoord (' . $code . ').'];
+    $basic = $d['loginName'] . ':' . $d['appPassword'];
 
-    [$code, $antw] = ncHttp('GET', $basis . '/ocs/v2.php/cloud/user?format=json',
-        ['Authorization: Bearer ' . $token['access_token'], 'OCS-APIRequest: true', 'Accept: application/json']);
+    [$code, $antw] = ncHttp('GET', $basis . '/ocs/v2.php/cloud/user?format=json', ['OCS-APIRequest: true', 'Accept: application/json'], null, $basic);
     $gebruiker = json_decode($antw, true)['ocs']['data'] ?? null;
+    // Het tijdelijke app-wachtwoord meteen weer intrekken
+    ncHttp('DELETE', $basis . '/ocs/v2.php/core/apppassword', ['OCS-APIRequest: true'], null, $basic);
 
-    // De website heeft het token hierna niet meer nodig: netjes intrekken bij Nextcloud (lukt dat niet, dan is het niet erg)
-    ncHttp('DELETE', $basis . '/ocs/v2.php/core/apppassword', ['Authorization: Bearer ' . $token['access_token'], 'OCS-APIRequest: true']);
-
-    if ($code !== 200 || !is_array($gebruiker) || empty($gebruiker['id'])) return 'Je gegevens konden niet worden opgehaald bij Nextcloud.';
+    if ($code !== 200 || !is_array($gebruiker) || empty($gebruiker['id'])) return ['status' => 'fout', 'melding' => 'Je gegevens konden niet worden opgehaald bij Nextcloud.'];
     $groep = (string)($cfg['nextcloud_groep'] ?? '');
     if ($groep !== '' && !in_array($groep, (array)($gebruiker['groups'] ?? []), true)) {
-        return 'Je bent ingelogd bij Nextcloud, maar je account hoort niet bij de groep "' . $groep . '". Vraag het bestuur om je toe te voegen.';
+        return ['status' => 'fout', 'melding' => 'Je bent ingelogd bij Nextcloud, maar je account hoort niet bij de groep "' . $groep . '". Vraag het bestuur om je toe te voegen.'];
     }
-
     session_regenerate_id(true);
     $_SESSION['leden'] = true;
     $_SESSION['naam'] = (string)($gebruiker['displayname'] ?? $gebruiker['display-name'] ?? $gebruiker['id']);
-    header('Location: ' . url('leden'), true, 303);
-    exit;
+    return ['status' => 'ok'];
 }
 
 function grootte(int $b): string {
