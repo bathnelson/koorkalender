@@ -403,6 +403,95 @@ function ncDownload(array $cfg, string $pad): void {
     }
 }
 
+// ---------- Inloggen met Nextcloud (OAuth 2.0) ----------
+
+function ssoAan(array $cfg): bool {
+    return ($cfg['nextcloud_url'] ?? '') !== '' && ($cfg['nextcloud_client_id'] ?? '') !== '' && ($cfg['nextcloud_client_geheim'] ?? '') !== '';
+}
+
+function volledigeUrl(string $pad): string {
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+    $host = preg_replace('/[^A-Za-z0-9.:\-\[\]]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    return ($https ? 'https' : 'http') . '://' . $host . $pad;
+}
+
+function ssoTerugAdres(): string { return volledigeUrl(url('leden')); }
+
+function ssoStart(array $cfg): void {
+    startSessie();
+    $_SESSION['sso_state'] = bin2hex(random_bytes(16));
+    $adres = rtrim($cfg['nextcloud_url'], '/') . '/index.php/apps/oauth2/authorize?' . http_build_query([
+        'response_type' => 'code',
+        'client_id' => $cfg['nextcloud_client_id'],
+        'redirect_uri' => ssoTerugAdres(),
+        'state' => $_SESSION['sso_state'],
+    ]);
+    header('Location: ' . $adres, true, 303);
+    exit;
+}
+
+function ncHttp(string $methode, string $adres, array $koppen = [], ?string $body = null): array {
+    $c = curl_init($adres);
+    curl_setopt_array($c, [
+        CURLOPT_CUSTOMREQUEST => $methode,
+        CURLOPT_HTTPHEADER => $koppen,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
+    ]);
+    if ($body !== null) curl_setopt($c, CURLOPT_POSTFIELDS, $body);
+    $antw = curl_exec($c);
+    $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+    curl_close($c);
+    return [$code, $antw === false ? '' : (string)$antw];
+}
+
+// Verwerkt de terugkeer van Nextcloud. Geeft null als het gelukt is (de functie stuurt dan door), anders een foutmelding.
+function ssoTerug(array $cfg): ?string {
+    startSessie();
+    $state = (string)($_GET['state'] ?? '');
+    $verwacht = (string)($_SESSION['sso_state'] ?? '');
+    unset($_SESSION['sso_state']);
+    if ($verwacht === '' || !hash_equals($verwacht, $state)) return 'Het inloggen is verlopen. Probeer het opnieuw.';
+    if (isset($_GET['error'])) return 'Inloggen bij Nextcloud is afgebroken.';
+
+    $basis = rtrim($cfg['nextcloud_url'], '/');
+    [$code, $antw] = ncHttp('POST', $basis . '/index.php/apps/oauth2/api/v1/token',
+        ['Content-Type: application/x-www-form-urlencoded', 'Accept: application/json'],
+        http_build_query([
+            'grant_type' => 'authorization_code',
+            'code' => (string)($_GET['code'] ?? ''),
+            'redirect_uri' => ssoTerugAdres(),
+            'client_id' => $cfg['nextcloud_client_id'],
+            'client_secret' => $cfg['nextcloud_client_geheim'],
+        ]));
+    $token = json_decode($antw, true);
+    if ($code !== 200 || !is_array($token) || empty($token['access_token'])) {
+        return 'Nextcloud gaf geen toegang (' . $code . '). Controleer Client-ID, geheim en doorstuur-URL in config.php.';
+    }
+
+    [$code, $antw] = ncHttp('GET', $basis . '/ocs/v2.php/cloud/user?format=json',
+        ['Authorization: Bearer ' . $token['access_token'], 'OCS-APIRequest: true', 'Accept: application/json']);
+    $gebruiker = json_decode($antw, true)['ocs']['data'] ?? null;
+
+    // De website heeft het token hierna niet meer nodig: netjes intrekken bij Nextcloud (lukt dat niet, dan is het niet erg)
+    ncHttp('DELETE', $basis . '/ocs/v2.php/core/apppassword', ['Authorization: Bearer ' . $token['access_token'], 'OCS-APIRequest: true']);
+
+    if ($code !== 200 || !is_array($gebruiker) || empty($gebruiker['id'])) return 'Je gegevens konden niet worden opgehaald bij Nextcloud.';
+    $groep = (string)($cfg['nextcloud_groep'] ?? '');
+    if ($groep !== '' && !in_array($groep, (array)($gebruiker['groups'] ?? []), true)) {
+        return 'Je bent ingelogd bij Nextcloud, maar je account hoort niet bij de groep "' . $groep . '". Vraag het bestuur om je toe te voegen.';
+    }
+
+    session_regenerate_id(true);
+    $_SESSION['leden'] = true;
+    $_SESSION['naam'] = (string)($gebruiker['displayname'] ?? $gebruiker['display-name'] ?? $gebruiker['id']);
+    header('Location: ' . url('leden'), true, 303);
+    exit;
+}
+
 function grootte(int $b): string {
     if ($b < 1024) return $b . ' B';
     if ($b < 1048576) return round($b / 1024) . ' kB';
