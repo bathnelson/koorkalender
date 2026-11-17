@@ -18,10 +18,10 @@ return [
 
     // ---- Jaarkalender (de koorkalender op dezelfde host) ----
 
-    // Pad naar planning.json van de koorkalender, gezien vanaf deze map.
+    // Pad naar planning.json van de koorkalender. Standaard staat de kalender in de submap kalender/ van de website.
     // Hieruit komt de openbare concertagenda (alleen afspraken van de soort 'Optreden').
     // Leeg laten = geen concertagenda.
-    'kalender_data' => __DIR__ . '/../kalender/data/planning.json',
+    'kalender_data' => __DIR__ . '/kalender/data/planning.json',
 
     // Adres van de jaarkalender voor leden. Gebruik de geheime ledenlink van de beheerpagina van de kalender
     // als die is afgeschermd. Wordt in het ledengedeelte getoond.

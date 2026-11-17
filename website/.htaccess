@@ -7,6 +7,7 @@ DirectoryIndex index.php
 </FilesMatch>
 
 RewriteEngine On
-# Bestaande bestanden (opmaak, foto's) gewoon tonen, al het andere naar index.php
+# Bestaande bestanden en mappen (opmaak, foto's, de kalender in kalender/) gewoon tonen, al het andere naar index.php
 RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [L,QSA]

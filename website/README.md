@@ -9,11 +9,11 @@ Een kleine website in PHP, zonder database. Draait op gewone webhosting (bijvoor
 
 ## Installeren
 
-1. Upload de inhoud van deze map naar de webroot van het domein (of een submap). De koorkalender staat het handigst in een submap `kalender/` ernaast.
+1. Upload de inhoud van deze map naar de webroot van het domein (bij Vimexx meestal `public_html`). Zet de koorkalender (de inhoud van `backend/`) in de submap `kalender/` daarbinnen, dus `public_html/kalender/`.
 2. Zorg dat de map `inhoud/` (en `inhoud/fotos/`) schrijfbaar is voor PHP. Bij Vimexx is dat normaal al zo.
 3. Vul `config.php` in, op de host en niet in git:
    - `beheer_wachtwoord` en `leden_wachtwoord`
-   - `kalender_data`: pad naar `planning.json` van de koorkalender (standaard `../kalender/data/planning.json`)
+   - `kalender_data`: pad naar `planning.json` van de koorkalender (standaard `kalender/data/planning.json`)
    - `kalender_url`: adres van de kalender voor leden (de geheime ledenlink als de kalender is afgeschermd)
    - Nextcloud: adres, gebruiker, app-wachtwoord en de map die leden mogen zien
 4. Ga naar `/beheer`, log in en pas de standaardpagina's aan.
