@@ -26,13 +26,23 @@ if (ssoAan($CONFIG) && isset($_GET['sso'])) {
     exit;
 }
 
+if (ssoAan($CONFIG) && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['nc_naam'])) {
+    $melding = ssoFormulier($CONFIG, (string)$_POST['nc_naam'], (string)($_POST['nc_wachtwoord'] ?? ''));
+    if ($melding === null) { header('Location: ' . url('leden'), true, 303); exit; }
+    sleep(1);
+}
+
 if (!ingelogd('leden')) {
     $metWachtwoord = !in_array((string)($CONFIG['leden_wachtwoord'] ?? ''), ['', 'verander-mij'], true);
     kop($CONFIG, 'Leden', 'leden');
     echo '<section class="inlog"><h1>Voor leden</h1>';
     if ($melding) echo '<p class="fout">' . h($melding) . '</p>';
     if (ssoAan($CONFIG)) {
-        echo '<p>Log in met je Nextcloud-account van het koor.</p><p><button type="button" id="ncknop">Inloggen met Nextcloud</button></p><p id="ncstatus" class="stil" hidden></p>';
+        echo '<p>Log in met je Nextcloud-account van het koor.</p>'
+            . '<form method="post"><label>Gebruikersnaam of e-mailadres<input name="nc_naam" autocomplete="username" required autofocus value="' . h($_POST['nc_naam'] ?? '') . '"></label>'
+            . '<label>Wachtwoord<input type="password" name="nc_wachtwoord" autocomplete="current-password" required></label><button>Inloggen</button></form>'
+            . '<p class="stil">Je wachtwoord gaat alleen naar Nextcloud en wordt niet bewaard.</p>'
+            . '<p class="stil">Heb je tweestapsverificatie aan? <button type="button" id="ncknop" class="licht klein">Inloggen via Nextcloud</button></p><p id="ncstatus" class="stil" hidden></p>';
         echo <<<'JS'
 <script>
 (function () {
