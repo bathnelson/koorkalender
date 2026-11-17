@@ -33,16 +33,14 @@ Wat in die map komt, staat meteen in het ledengedeelte. Bestanden toevoegen doe 
 
 ## Inloggen met Nextcloud
 
-Leden kunnen ook inloggen met hun eigen Nextcloud-account in plaats van met het gezamenlijke ledenwachtwoord.
+Leden kunnen inloggen met hun eigen Nextcloud-account in plaats van met het gezamenlijke ledenwachtwoord. Dit gebruikt *Login Flow*, de manier waarop ook de Nextcloud-apps inloggen. Dat zit in elke Nextcloud, ook bij Hetzner Storage Share, en er hoeft in Nextcloud niets voor ingesteld te worden.
 
-1. Ga in Nextcloud als beheerder naar *Beheer > Beveiliging > OAuth 2.0-clients*.
-2. Naam: bijvoorbeeld `Website Wereldkoor`. Doorstuur-URL: het volledige adres van het ledengedeelte, precies zo, bijvoorbeeld `https://hansb.nl/wkh-website/leden` (later `https://www.wereldkoorhaarlem.com/leden`).
-3. Zet de Client-ID en het geheim in `config.php` bij `nextcloud_client_id` en `nextcloud_client_geheim`.
-4. Wil je alleen een bepaalde groep toelaten, zet de groepsnaam bij `nextcloud_groep`.
+1. Zet in `config.php` `nextcloud_login` op `true` (en vul `nextcloud_url` in).
+2. Wil je alleen een bepaalde groep toelaten, zet de groepsnaam bij `nextcloud_groep`.
 
-Op de inlogpagina staat dan de knop *Inloggen met Nextcloud*. Laat je `leden_wachtwoord` op `verander-mij` staan, dan is dat de enige manier om in te loggen.
+Op de inlogpagina staat dan de knop *Inloggen met Nextcloud*. Er opent een venster van Nextcloud zelf; het lid logt daar in en klikt op *Toegang verlenen*. De website gaat daarna vanzelf verder. Het wachtwoord komt dus nooit langs de website, en tweestapsverificatie werkt gewoon. De website trekt het tijdelijke app-wachtwoord dat Nextcloud daarbij maakt meteen weer in.
 
-De bestanden in het ledengedeelte komen nog steeds via het website-account (zie hierboven), zodat iedereen dezelfde ledenmap ziet. Na het inloggen trekt de website het tijdelijke Nextcloud-token meteen weer in.
+Laat je `leden_wachtwoord` op `verander-mij` staan, dan is Nextcloud de enige manier om in te loggen. De bestanden in het ledengedeelte komen nog steeds via het website-account (zie hierboven), zodat iedereen dezelfde ledenmap ziet.
 
 ## Tekst opmaken
 

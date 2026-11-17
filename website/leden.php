@@ -14,9 +14,16 @@ if (($_POST['actie'] ?? '') === 'uitloggen') {
 $melding = probeerLogin('leden', $CONFIG);
 
 // Inloggen met Nextcloud
-if (ssoAan($CONFIG)) {
-    if (isset($_GET['sso'])) ssoStart($CONFIG);
-    if (isset($_GET['state'])) $melding = ssoTerug($CONFIG);
+if (ssoAan($CONFIG) && isset($_GET['sso'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if ($_GET['sso'] === 'start') {
+        $login = ssoStart($CONFIG);
+        echo json_encode($login ? ['login' => $login] : ['fout' => 'Nextcloud is niet bereikbaar. Probeer het later opnieuw.']);
+    } else {
+        echo json_encode(ssoCheck($CONFIG));
+    }
+    exit;
 }
 
 if (!ingelogd('leden')) {
@@ -25,7 +32,42 @@ if (!ingelogd('leden')) {
     echo '<section class="inlog"><h1>Voor leden</h1>';
     if ($melding) echo '<p class="fout">' . h($melding) . '</p>';
     if (ssoAan($CONFIG)) {
-        echo '<p>Log in met je Nextcloud-account van het koor.</p><p><a class="knop" href="' . h(url('leden') . '?sso=1') . '">Inloggen met Nextcloud</a></p>';
+        echo '<p>Log in met je Nextcloud-account van het koor.</p><p><button type="button" id="ncknop">Inloggen met Nextcloud</button></p><p id="ncstatus" class="stil" hidden></p>';
+        echo <<<'JS'
+<script>
+(function () {
+  const knop = document.getElementById('ncknop'), status = document.getElementById('ncstatus');
+  const zeg = (t, fout) => { status.hidden = false; status.textContent = t; status.className = fout ? 'fout' : 'stil'; };
+  const wacht = async venster => {
+    zeg('Log in in het Nextcloud-venster en klik daar op "Toegang verlenen". Deze pagina gaat daarna vanzelf verder.');
+    const tot = Date.now() + 20 * 60000;
+    while (Date.now() < tot) {
+      await new Promise(k => setTimeout(k, 2000));
+      const c = await (await fetch('?sso=check', { credentials: 'same-origin' })).json();
+      if (c.status === 'ok') { try { venster && venster.close(); } catch (e) {} location.reload(); return; }
+      if (c.status === 'fout') throw new Error(c.melding);
+    }
+    throw new Error('Het inloggen duurde te lang. Probeer het opnieuw.');
+  };
+  const mis = (e, venster) => { try { venster && venster.close(); } catch (x) {} zeg(e.message, true); knop.disabled = false; };
+  knop.addEventListener('click', async () => {
+    const venster = window.open('', 'nextcloud');
+    knop.disabled = true; zeg('Nextcloud wordt geopend…');
+    try {
+      const r = await (await fetch('?sso=start', { credentials: 'same-origin' })).json();
+      if (!r.login) throw new Error(r.fout || 'Nextcloud is niet bereikbaar.');
+      if (!venster) { try { sessionStorage.setItem('ncbezig', '1'); } catch (e) {} location.href = r.login; return; }
+      venster.location = r.login;
+      await wacht(venster);
+    } catch (e) { mis(e, venster); }
+  });
+  // Kon er geen nieuw venster open (bijv. op sommige telefoons), dan ging het in dit venster: na terugkomen verder wachten
+  let bezig = false;
+  try { bezig = sessionStorage.getItem('ncbezig') === '1'; sessionStorage.removeItem('ncbezig'); } catch (e) {}
+  if (bezig) { knop.disabled = true; wacht(null).catch(e => mis(e, null)); }
+})();
+</script>
+JS;
         if ($metWachtwoord) echo '<p class="stil">Of met het gezamenlijke ledenwachtwoord:</p>';
     } else {
         echo '<p>Log in met het ledenwachtwoord. Dat krijg je van het bestuur.</p>';
