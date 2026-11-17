@@ -39,10 +39,10 @@ if (!ingelogd('leden')) {
     if ($melding) echo '<p class="fout">' . h($melding) . '</p>';
     if (ssoAan($CONFIG)) {
         echo '<p>Log in met je Nextcloud-account van het koor.</p>'
-            . '<form method="post"><label>Gebruikersnaam of e-mailadres<input name="nc_naam" autocomplete="username" required autofocus value="' . h($_POST['nc_naam'] ?? '') . '"></label>'
+            . '<form method="post"><label>Gebruikersnaam<input name="nc_naam" autocomplete="username" required autofocus value="' . h($_POST['nc_naam'] ?? '') . '"></label>'
             . '<label>Wachtwoord<input type="password" name="nc_wachtwoord" autocomplete="current-password" required></label><button>Inloggen</button></form>'
             . '<p class="stil">Je wachtwoord gaat alleen naar Nextcloud en wordt niet bewaard.</p>'
-            . '<p class="stil">Heb je tweestapsverificatie aan? <button type="button" id="ncknop" class="licht klein">Inloggen via Nextcloud</button></p><p id="ncstatus" class="stil" hidden></p>';
+            . '<p class="stil">Lukt dat niet, of heb je tweestapsverificatie aan? <button type="button" id="ncknop" class="licht klein">Inloggen via Nextcloud</button></p><p id="ncstatus" class="stil" hidden></p>';
         echo <<<'JS'
 <script>
 (function () {

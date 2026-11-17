@@ -44,4 +44,7 @@ return [
 
     // Map in dat account die leden mogen zien, bijvoorbeeld 'Koor/Leden'. Alles daarbuiten blijft onzichtbaar.
     'nextcloud_map' => 'Leden',
+    // Staat nextcloud_map leeg (''), dan zie je de hoofdmap van Nextcloud. Met true staan daar alleen de teammappen,
+    // dus niet de eigen mappen van het lid zoals Documents en Photos.
+    'nextcloud_alleen_teammappen' => true,
 ];

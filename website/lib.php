@@ -336,7 +336,7 @@ function ncCurl(array $cfg, string $adres) {
 function ncLijst(array $cfg, string $pad) {
     $adres = ncAdres($cfg, $pad);
     $c = ncCurl($cfg, $adres . '/');
-    $body = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/><d:getcontenttype/></d:prop></d:propfind>';
+    $body = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:nc="http://nextcloud.org/ns"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/><d:getcontenttype/><nc:mount-type/></d:prop></d:propfind>';
     curl_setopt_array($c, [
         CURLOPT_CUSTOMREQUEST => 'PROPFIND',
         CURLOPT_HTTPHEADER => ['Depth: 1', 'Content-Type: application/xml'],
@@ -367,13 +367,21 @@ function ncLijst(array $cfg, string $pad) {
         if ($href === rawurldecode($eigen)) continue;
         $naam = basename($href);
         if ($naam === '' || $naam[0] === '.') continue;
+        $r->registerXPathNamespace('nc', 'http://nextcloud.org/ns');
         $isMap = (bool)$r->xpath('.//d:resourcetype/d:collection');
+        $team = (string)($r->xpath('.//nc:mount-type')[0] ?? '') === 'group';
         $rij = [
             'naam' => $naam,
             'grootte' => (int)($r->xpath('.//d:getcontentlength')[0] ?? 0),
             'gewijzigd' => strtotime((string)($r->xpath('.//d:getlastmodified')[0] ?? '')) ?: 0,
+            'team' => $team,
         ];
         if ($isMap) $mappen[] = $rij; else $bestanden[] = $rij;
+    }
+    // Bovenaan alleen de teammappen tonen (welke dat zijn hangt af van de rechten van het lid in Nextcloud)
+    if ($pad === '' && trim((string)$cfg['nextcloud_map'], '/') === '' && !empty($cfg['nextcloud_alleen_teammappen'])) {
+        $mappen = array_values(array_filter($mappen, function ($m) { return $m['team']; }));
+        $bestanden = [];
     }
     $opNaam = function ($a, $b) { return strnatcasecmp($a['naam'], $b['naam']); };
     usort($mappen, $opNaam);
@@ -506,7 +514,7 @@ function ssoFormulier(array $cfg, string $naam, string $wachtwoord): ?string {
     if ($code === 403) {
         return ssoVoltooi($cfg, $naam, $wachtwoord, true);
     }
-    if ($code === 401) return 'Gebruikersnaam of wachtwoord klopt niet. Heb je tweestapsverificatie aan, gebruik dan de knop hieronder.';
+    if ($code === 401) return 'Inloggen lukte niet. Controleer je gebruikersnaam (niet je e-mailadres) en wachtwoord, of gebruik de knop "Inloggen via Nextcloud" hieronder.';
     if ($code === 0) return 'Nextcloud is niet bereikbaar. Probeer het later opnieuw.';
     return 'Inloggen lukte niet (' . $code . ').';
 }
