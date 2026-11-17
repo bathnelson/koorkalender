@@ -2,3 +2,10 @@
 backend/data/*.json
 backend/data/backup/
 backend/data/.lock
+
+# Website: de pagina's, foto's en reservekopieën staan alleen op de host
+website/inhoud/*.json
+website/inhoud/.lock
+website/inhoud/backup/
+website/inhoud/fotos/*
+!website/inhoud/fotos/.gitkeep

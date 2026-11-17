@@ -1,0 +1,436 @@
+<?php
+declare(strict_types=1);
+
+// Gedeelde code voor de website: instellingen, opslag, inloggen, tekstopmaak, concerten en Nextcloud.
+
+$CONFIG = require __DIR__ . '/config.php';
+date_default_timezone_set('Europe/Amsterdam');
+
+const INHOUD_DIR = __DIR__ . '/inhoud';
+const PAGINAS_FILE = INHOUD_DIR . '/paginas.json';
+const FOTO_DIR = INHOUD_DIR . '/fotos';
+const BACKUP_DIR = INHOUD_DIR . '/backup';
+const MAX_BACKUPS = 50;
+
+function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+
+function basisUrl(): string {
+    $s = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? '/index.php'));
+    if (basename($s) !== 'index.php') return '/';
+    return rtrim(dirname($s), '/') . '/';
+}
+function url(string $pad = ''): string { return basisUrl() . ltrim($pad, '/'); }
+function paginaUrl(string $slug): string { return $slug === 'home' ? url() : url($slug); }
+
+// ---------- sessie en inloggen ----------
+
+function startSessie(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) return;
+    $veilig = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    session_name('wkh');
+    session_set_cookie_params(['lifetime' => 0, 'path' => basisUrl(), 'secure' => $veilig, 'httponly' => true, 'samesite' => 'Lax']);
+    session_start();
+}
+
+function wachtwoordKlopt(string $ingevoerd, string $goed): bool {
+    if ($goed === '' || $goed === 'verander-mij') return false;
+    if (strpos($goed, '$2y$') === 0) return password_verify($ingevoerd, $goed);
+    return hash_equals($goed, $ingevoerd);
+}
+
+// $rol is 'beheer' of 'leden'. Beheer mag ook in het ledengedeelte.
+function ingelogd(string $rol): bool {
+    startSessie();
+    if (!empty($_SESSION['beheer'])) return true;
+    return $rol === 'leden' && !empty($_SESSION['leden']);
+}
+
+function probeerLogin(string $rol, array $cfg): ?string {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !isset($_POST['wachtwoord'])) return null;
+    startSessie();
+    $goed = (string)($cfg[$rol === 'beheer' ? 'beheer_wachtwoord' : 'leden_wachtwoord'] ?? '');
+    if (wachtwoordKlopt((string)$_POST['wachtwoord'], $goed)) {
+        session_regenerate_id(true);
+        $_SESSION[$rol] = true;
+        header('Location: ' . strtok($_SERVER['REQUEST_URI'] ?? url(), '?'), true, 303);
+        exit;
+    }
+    sleep(1); // remt raden af
+    return $goed === 'verander-mij' || $goed === '' ? 'Er is nog geen wachtwoord ingesteld in config.php.' : 'Dat wachtwoord klopt niet.';
+}
+
+function uitloggen(): void {
+    startSessie();
+    $_SESSION = [];
+    session_destroy();
+}
+
+function csrfToken(): string {
+    startSessie();
+    if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(16));
+    return $_SESSION['csrf'];
+}
+function controleerCsrf(): void {
+    startSessie();
+    $t = $_POST['csrf'] ?? '';
+    if (!is_string($t) || empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $t)) {
+        http_response_code(400);
+        exit('Het formulier is verlopen. Ga terug en probeer het opnieuw.');
+    }
+}
+
+// ---------- pagina's ----------
+
+function laadPaginas(): array {
+    if (!is_file(PAGINAS_FILE)) return standaardPaginas();
+    $data = json_decode((string)file_get_contents(PAGINAS_FILE), true);
+    return is_array($data) && isset($data['paginas']) && is_array($data['paginas']) ? $data['paginas'] : standaardPaginas();
+}
+
+function bewaarPaginas(array $paginas): void {
+    if (!is_dir(INHOUD_DIR)) mkdir(INHOUD_DIR, 0775, true);
+    if (!is_dir(BACKUP_DIR)) mkdir(BACKUP_DIR, 0775, true);
+    $lock = fopen(INHOUD_DIR . '/.lock', 'c');
+    flock($lock, LOCK_EX);
+    try {
+        if (is_file(PAGINAS_FILE)) {
+            copy(PAGINAS_FILE, BACKUP_DIR . '/paginas-' . date('Ymd-His') . '-' . bin2hex(random_bytes(2)) . '.json');
+            $oud = glob(BACKUP_DIR . '/paginas-*.json') ?: [];
+            sort($oud);
+            foreach (array_slice($oud, 0, max(0, count($oud) - MAX_BACKUPS)) as $f) @unlink($f);
+        }
+        uasort($paginas, function ($a, $b) { return [$a['volgorde'], $a['titel']] <=> [$b['volgorde'], $b['titel']]; });
+        $tmp = PAGINAS_FILE . '.tmp';
+        if (file_put_contents($tmp, json_encode(['versie' => 1, 'paginas' => $paginas], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false || !rename($tmp, PAGINAS_FILE)) {
+            http_response_code(500);
+            exit('Opslaan mislukt: de map inhoud/ is niet schrijfbaar.');
+        }
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+function geldigeSlug(string $s): bool { return (bool)preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $s) && strlen($s) <= 60; }
+
+function maakSlug(string $titel): string {
+    $s = strtolower(trim($titel));
+    $s = strtr($s, ['ë' => 'e', 'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ï' => 'i', 'í' => 'i', 'ö' => 'o', 'ó' => 'o', 'ü' => 'u', 'ú' => 'u', 'á' => 'a', 'à' => 'a', 'ä' => 'a', 'ç' => 'c', 'ñ' => 'n']);
+    $s = trim((string)preg_replace('/[^a-z0-9]+/', '-', $s), '-');
+    return substr($s, 0, 60) ?: 'pagina';
+}
+
+// Gereserveerd voor de vaste onderdelen van de site
+const VASTE_ADRESSEN = ['beheer', 'leden', 'inhoud', 'index', 'stijl'];
+
+function standaardPaginas(): array {
+    return [
+        'home' => ['titel' => 'Home', 'menu' => true, 'volgorde' => 0, 'concerten' => true,
+            'tekst' => "# Welkom bij Wereldkoor Haarlem\n\nWe zingen liederen uit de hele wereld. Kom eens luisteren, of zing mee!\n\nDeze tekst pas je aan op de beheerpagina."],
+        'over-ons' => ['titel' => 'Over ons', 'menu' => true, 'volgorde' => 10, 'concerten' => false,
+            'tekst' => "# Over ons\n\nVertel hier wie jullie zijn, waar en wanneer jullie repeteren, en wie de dirigent is."],
+        'concerten' => ['titel' => 'Concerten', 'menu' => true, 'volgorde' => 20, 'concerten' => true,
+            'tekst' => "# Concerten\n\nDe concerten hieronder komen automatisch uit de jaarkalender."],
+        'contact' => ['titel' => 'Contact', 'menu' => true, 'volgorde' => 90, 'concerten' => false,
+            'tekst' => "# Contact\n\nMail ons op [ons e-mailadres](mailto:info@example.org)."],
+    ];
+}
+
+// ---------- tekstopmaak (een eenvoudige, veilige vorm van Markdown) ----------
+//
+//   # Kop, ## Kleinere kop     **vet**   *schuin*   [tekst](https://link)
+//   - opsomming                1. genummerd
+//   ![onderschrift](fotos/naam.jpg)   losse foto's onder elkaar worden een fotogalerij
+//   youtube: https://www.youtube.com/watch?v=...   wordt een video
+//   knop: [Kaartjes](https://...)                  wordt een knop
+//
+// Alle tekst wordt eerst ontsmet, dus HTML in de tekst doet niets.
+
+function veiligAdres(string $u): ?string {
+    $u = trim($u);
+    if (preg_match('~^(https?://|mailto:|tel:)~i', $u)) return $u;
+    if (preg_match('~^(/|#)~', $u) && strpos($u, '//') !== 0) return $u;
+    if (preg_match('~^fotos/[A-Za-z0-9._-]+$~', $u)) return url('inhoud/' . $u);
+    if (preg_match('~^[a-z0-9-]+$~', $u)) return paginaUrl($u);
+    return null;
+}
+
+function inline(string $t): string {
+    $t = h($t);
+    // links [tekst](adres)
+    $t = preg_replace_callback('~\[([^\]]+)\]\(([^)\s]+)\)~', function ($m) {
+        $adres = veiligAdres(html_entity_decode($m[2], ENT_QUOTES, 'UTF-8'));
+        if ($adres === null) return $m[1];
+        $extern = preg_match('~^https?://~i', $adres) ? ' target="_blank" rel="noopener"' : '';
+        return '<a href="' . h($adres) . '"' . $extern . '>' . $m[1] . '</a>';
+    }, $t);
+    $t = preg_replace('~\*\*(.+?)\*\*~s', '<strong>$1</strong>', $t);
+    $t = preg_replace('~(?<![*\w])\*(?!\s)(.+?)(?<!\s)\*(?!\w)~s', '<em>$1</em>', $t);
+    return $t;
+}
+
+function youtubeId(string $u): ?string {
+    if (preg_match('~(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|live/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})~', $u, $m)) return $m[1];
+    return null;
+}
+
+function opmaak(string $tekst): string {
+    $uit = [];
+    $alinea = [];
+    $lijst = null; // 'ul' of 'ol'
+    $galerij = [];
+
+    $sluitTekst = function () use (&$uit, &$alinea, &$lijst) {
+        if ($alinea) { $uit[] = '<p>' . implode('<br>', array_map('inline', $alinea)) . '</p>'; $alinea = []; }
+        if ($lijst) { $uit[] = '</' . $lijst . '>'; $lijst = null; }
+    };
+    $sluitGalerij = function () use (&$uit, &$galerij) {
+        if (!$galerij) return;
+        $uit[] = '<div class="' . (count($galerij) > 1 ? 'galerij' : 'foto') . '">' . implode('', $galerij) . '</div>';
+        $galerij = [];
+    };
+
+    foreach (preg_split('/\r\n|\r|\n/', $tekst) as $r) {
+        $t = trim($r);
+        if ($t === '') { $sluitTekst(); $sluitGalerij(); continue; }
+
+        // foto: ![onderschrift](fotos/naam.jpg)
+        if (preg_match('/^!\[([^\]]*)\]\(([^)\s]+)\)$/', $t, $m)) {
+            $sluitTekst();
+            $adres = veiligAdres($m[2]);
+            if ($adres !== null) {
+                $onder = $m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '';
+                $galerij[] = '<figure><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '" loading="lazy"></a>' . $onder . '</figure>';
+            }
+            continue;
+        }
+        $sluitGalerij();
+
+        if (preg_match('/^youtube:\s*(\S+)$/i', $t, $m)) {
+            $sluitTekst();
+            $id = youtubeId($m[1]);
+            if ($id) $uit[] = '<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/' . h($id) . '" title="Video" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>';
+            continue;
+        }
+        if (preg_match('/^knop:\s*\[([^\]]+)\]\(([^)\s]+)\)$/i', $t, $m)) {
+            $sluitTekst();
+            $adres = veiligAdres($m[2]);
+            if ($adres !== null) $uit[] = '<p><a class="knop" href="' . h($adres) . '"' . (preg_match('~^https?://~i', $adres) ? ' target="_blank" rel="noopener"' : '') . '>' . h($m[1]) . '</a></p>';
+            continue;
+        }
+        if (preg_match('/^(#{1,3})\s+(.*)$/', $t, $m)) {
+            $sluitTekst();
+            $n = strlen($m[1]);
+            $uit[] = '<h' . $n . '>' . inline($m[2]) . '</h' . $n . '>';
+            continue;
+        }
+        if (preg_match('/^(-|\*|\d+\.)\s+(.*)$/', $t, $m)) {
+            $soort = $m[1] === '-' || $m[1] === '*' ? 'ul' : 'ol';
+            if ($alinea) { $uit[] = '<p>' . implode('<br>', array_map('inline', $alinea)) . '</p>'; $alinea = []; }
+            if ($lijst !== $soort) { if ($lijst) $uit[] = '</' . $lijst . '>'; $uit[] = '<' . $soort . '>'; $lijst = $soort; }
+            $uit[] = '<li>' . inline($m[2]) . '</li>';
+            continue;
+        }
+        if ($lijst) { $uit[] = '</' . $lijst . '>'; $lijst = null; }
+        $alinea[] = $t;
+    }
+    $sluitTekst();
+    $sluitGalerij();
+    return implode("\n", $uit);
+}
+
+// ---------- concerten uit de koorkalender ----------
+
+function komendeConcerten(array $cfg, int $max = 20): array {
+    $bestand = (string)($cfg['kalender_data'] ?? '');
+    if ($bestand === '' || !is_file($bestand)) return [];
+    $data = json_decode((string)file_get_contents($bestand), true);
+    $items = is_array($data['items'] ?? null) ? $data['items'] : [];
+    $vandaag = date('Y-m-d');
+    $uit = [];
+    foreach ($items as $i) {
+        if (($i['soort'] ?? '') !== 'Optreden') continue;
+        $eind = ($i['tm'] ?? '') !== '' ? $i['tm'] : ($i['datum'] ?? '');
+        if ($eind < $vandaag) continue;
+        $uit[] = $i;
+    }
+    usort($uit, function ($a, $b) { return [$a['datum'], $a['tijd'] ?? ''] <=> [$b['datum'], $b['tijd'] ?? '']; });
+    return array_slice($uit, 0, $max);
+}
+
+function datumNL(string $iso): string {
+    $d = DateTime::createFromFormat('Y-m-d', $iso);
+    if (!$d) return $iso;
+    $dagen = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+    $maanden = ['januari', 'februari', 'maart', 'april', 'mei', 'juni', 'juli', 'augustus', 'september', 'oktober', 'november', 'december'];
+    return $dagen[(int)$d->format('w')] . ' ' . (int)$d->format('j') . ' ' . $maanden[(int)$d->format('n') - 1] . ' ' . $d->format('Y');
+}
+
+function concertenHtml(array $cfg): string {
+    $lijst = komendeConcerten($cfg);
+    if (!$lijst) return '<p class="stil">Er staan op dit moment geen concerten gepland. Kijk binnenkort nog eens!</p>';
+    $uit = '<ul class="concerten">';
+    foreach ($lijst as $c) {
+        $wanneer = datumNL($c['datum']) . (($c['tm'] ?? '') !== '' ? ' t/m ' . datumNL($c['tm']) : '');
+        $uit .= '<li><div class="wanneer">' . h($wanneer) . (($c['tijd'] ?? '') !== '' ? ' · ' . h(str_replace('-', '–', $c['tijd'])) : '') . '</div>'
+            . '<div class="wat">' . h($c['titel'] ?? '') . '</div>'
+            . (($c['waar'] ?? '') !== '' ? '<div class="waar">' . h($c['waar']) . '</div>' : '')
+            . '</li>';
+    }
+    return $uit . '</ul>';
+}
+
+// ---------- Nextcloud (alleen lezen, via WebDAV) ----------
+
+function ncAan(array $cfg): bool {
+    return ($cfg['nextcloud_url'] ?? '') !== '' && ($cfg['nextcloud_gebruiker'] ?? '') !== '' && ($cfg['nextcloud_app_wachtwoord'] ?? '') !== '';
+}
+
+// Maakt van een pad uit de adresbalk een veilig pad binnen de ledenmap. Geeft null bij iets vreemds.
+function ncSchoonPad(string $pad): ?string {
+    $delen = [];
+    foreach (explode('/', str_replace('\\', '/', $pad)) as $d) {
+        if ($d === '' || $d === '.') continue;
+        if ($d === '..' || preg_match('/[\x00-\x1F\x7F]/', $d)) return null;
+        $delen[] = $d;
+    }
+    return implode('/', $delen);
+}
+
+function ncAdres(array $cfg, string $pad): string {
+    $basis = rtrim($cfg['nextcloud_url'], '/') . '/remote.php/dav/files/' . rawurlencode($cfg['nextcloud_gebruiker']) . '/';
+    $volledig = trim(trim((string)$cfg['nextcloud_map'], '/') . '/' . $pad, '/');
+    return $basis . implode('/', array_map('rawurlencode', $volledig === '' ? [] : explode('/', $volledig)));
+}
+
+function ncCurl(array $cfg, string $adres) {
+    $c = curl_init($adres);
+    curl_setopt_array($c, [
+        CURLOPT_USERPWD => $cfg['nextcloud_gebruiker'] . ':' . $cfg['nextcloud_app_wachtwoord'],
+        CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS | CURLPROTO_HTTP,
+    ]);
+    return $c;
+}
+
+// Geeft ['mappen' => [...], 'bestanden' => [...]] of een string met een foutmelding.
+function ncLijst(array $cfg, string $pad) {
+    $adres = ncAdres($cfg, $pad);
+    $c = ncCurl($cfg, $adres . '/');
+    $body = '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/><d:getcontentlength/><d:getlastmodified/><d:getcontenttype/></d:prop></d:propfind>';
+    curl_setopt_array($c, [
+        CURLOPT_CUSTOMREQUEST => 'PROPFIND',
+        CURLOPT_HTTPHEADER => ['Depth: 1', 'Content-Type: application/xml'],
+        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 20,
+    ]);
+    $antw = curl_exec($c);
+    $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+    curl_close($c);
+    if ($antw === false || $code === 0) return 'Nextcloud is niet bereikbaar.';
+    if ($code === 401) return 'De website kan niet inloggen bij Nextcloud. Controleer gebruiker en app-wachtwoord in config.php.';
+    if ($code === 404) return 'Deze map bestaat niet (meer).';
+    if ($code !== 207) return 'Nextcloud gaf een onverwacht antwoord (' . $code . ').';
+
+    $prev = libxml_use_internal_errors(true);
+    $xml = simplexml_load_string((string)$antw, 'SimpleXMLElement', LIBXML_NONET);
+    libxml_use_internal_errors($prev);
+    if ($xml === false) return 'Het antwoord van Nextcloud kon niet gelezen worden.';
+    $xml->registerXPathNamespace('d', 'DAV:');
+
+    $eigen = rtrim((string)parse_url($adres, PHP_URL_PATH), '/');
+    $mappen = [];
+    $bestanden = [];
+    foreach ($xml->xpath('//d:response') as $r) {
+        $r->registerXPathNamespace('d', 'DAV:');
+        $href = rtrim(rawurldecode((string)($r->xpath('d:href')[0] ?? '')), '/');
+        if ($href === rawurldecode($eigen)) continue;
+        $naam = basename($href);
+        if ($naam === '' || $naam[0] === '.') continue;
+        $isMap = (bool)$r->xpath('.//d:resourcetype/d:collection');
+        $rij = [
+            'naam' => $naam,
+            'grootte' => (int)($r->xpath('.//d:getcontentlength')[0] ?? 0),
+            'gewijzigd' => strtotime((string)($r->xpath('.//d:getlastmodified')[0] ?? '')) ?: 0,
+        ];
+        if ($isMap) $mappen[] = $rij; else $bestanden[] = $rij;
+    }
+    $opNaam = function ($a, $b) { return strnatcasecmp($a['naam'], $b['naam']); };
+    usort($mappen, $opNaam);
+    usort($bestanden, $opNaam);
+    return ['mappen' => $mappen, 'bestanden' => $bestanden];
+}
+
+// Stuurt een bestand van Nextcloud rechtstreeks door naar de browser.
+function ncDownload(array $cfg, string $pad): void {
+    $naam = basename($pad);
+    $c = ncCurl($cfg, ncAdres($cfg, $pad));
+    $begonnen = false;
+    $status = 0;
+    curl_setopt_array($c, [
+        CURLOPT_TIMEOUT => 0,
+        CURLOPT_HEADERFUNCTION => function ($c, $regel) use (&$status, &$begonnen, $naam) {
+            if (preg_match('~^HTTP/\S+\s+(\d+)~', $regel, $m)) $status = (int)$m[1];
+            if (!$begonnen && $status === 200 && preg_match('/^(Content-Length|Last-Modified):/i', $regel)) header(trim($regel));
+            return strlen($regel);
+        },
+        CURLOPT_WRITEFUNCTION => function ($c, $data) use (&$status, &$begonnen, $naam) {
+            if ($status !== 200) return strlen($data);
+            if (!$begonnen) {
+                $begonnen = true;
+                // Alleen bekende, veilige soorten mogen in de browser openen; de rest wordt gedownload
+                $soorten = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp',
+                    'mp3' => 'audio/mpeg', 'm4a' => 'audio/mp4', 'wav' => 'audio/wav', 'mp4' => 'video/mp4', 'txt' => 'text/plain; charset=utf-8'];
+                $ext = strtolower(pathinfo($naam, PATHINFO_EXTENSION));
+                header('Content-Type: ' . ($soorten[$ext] ?? 'application/octet-stream'));
+                header('Content-Disposition: ' . (isset($soorten[$ext]) ? 'inline' : 'attachment') . "; filename*=UTF-8''" . rawurlencode($naam));
+                header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: private, max-age=300');
+            }
+            echo $data;
+            return strlen($data);
+        },
+    ]);
+    curl_exec($c);
+    curl_close($c);
+    if (!$begonnen) {
+        http_response_code($status === 404 ? 404 : 502);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo $status === 404 ? 'Bestand niet gevonden.' : 'Het bestand kon niet worden opgehaald bij Nextcloud.';
+    }
+}
+
+function grootte(int $b): string {
+    if ($b < 1024) return $b . ' B';
+    if ($b < 1048576) return round($b / 1024) . ' kB';
+    return number_format($b / 1048576, 1, ',', '') . ' MB';
+}
+
+// ---------- opbouw van een pagina ----------
+
+function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = true): void {
+    $paginas = laadPaginas();
+    header('Content-Type: text/html; charset=utf-8');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    echo '<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<title>' . h($titel === '' || $titel === 'Home' ? $cfg['naam'] : $titel . ' | ' . $cfg['naam']) . '</title>';
+    echo '<link rel="stylesheet" href="' . h(url('stijl.css')) . '?v=' . @filemtime(__DIR__ . '/stijl.css') . '"></head><body>';
+    echo '<header class="kop"><div class="binnen"><a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
+    if ($menuTonen) {
+        echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
+        foreach ($paginas as $slug => $p) {
+            if (empty($p['menu'])) continue;
+            echo '<a href="' . h(paginaUrl($slug)) . '"' . ($slug === $actief ? ' class="actief"' : '') . '>' . h($p['titel']) . '</a>';
+        }
+        echo '<a href="' . h(url('leden')) . '" class="ledenknop' . ($actief === 'leden' ? ' actief' : '') . '">Leden</a></nav>';
+    }
+    echo '</div></header><main class="binnen">';
+}
+
+function voet(array $cfg): void {
+    echo '</main><footer class="voet"><div class="binnen">© ' . date('Y') . ' ' . h($cfg['naam']) . '</div></footer></body></html>';
+}
