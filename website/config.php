@@ -13,7 +13,8 @@ return [
     'beheer_wachtwoord' => 'verander-mij',
 
     // Wachtwoord voor het ledengedeelte (/leden). Eén gezamenlijk wachtwoord voor alle leden.
-    // Zolang hier 'verander-mij' staat, kan niemand inloggen.
+    // Zolang hier 'verander-mij' staat, kan niemand hiermee inloggen.
+    // Gebruik je "Inloggen met Nextcloud" (zie hieronder), dan kun je dit op 'verander-mij' laten staan.
     'leden_wachtwoord' => 'verander-mij',
 
     // ---- Jaarkalender (de koorkalender op dezelfde host) ----
@@ -35,6 +36,15 @@ return [
     'nextcloud_gebruiker' => '',
     // App-wachtwoord van dat account (Nextcloud > Instellingen > Beveiliging > Nieuw app-wachtwoord)
     'nextcloud_app_wachtwoord' => '',
+    // ---- Inloggen met Nextcloud (leden loggen in met hun eigen Nextcloud-account) ----
+    // Maak in Nextcloud bij Beheer > Beveiliging > OAuth 2.0-clients een client aan met als
+    // doorstuur-URL het volledige adres van het ledengedeelte, bijvoorbeeld https://hansb.nl/wkh-website/leden
+    // en zet de Client-ID en het geheim hier. Leeg laten = geen Nextcloud-knop.
+    'nextcloud_client_id' => '',
+    'nextcloud_client_geheim' => '',
+    // Alleen leden van deze Nextcloud-groep mogen erin (bijv. 'Wereldkoor'). Leeg = iedereen met een account.
+    'nextcloud_groep' => '',
+
     // Map in dat account die leden mogen zien, bijvoorbeeld 'Koor/Leden'. Alles daarbuiten blijft onzichtbaar.
     'nextcloud_map' => 'Leden',
 ];

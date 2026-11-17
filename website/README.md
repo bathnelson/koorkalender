@@ -18,6 +18,10 @@ Een kleine website in PHP, zonder database. Draait op gewone webhosting (bijvoor
    - Nextcloud: adres, gebruiker, app-wachtwoord en de map die leden mogen zien
 4. Ga naar `/beheer`, log in en pas de standaardpagina's aan.
 
+## Uploadlimiet voor foto's
+
+Grote foto's worden in de browser al verkleind tot maximaal 1600 pixels voordat ze worden geüpload. Geeft de host toch een melding dat een foto te groot is, dan staat de limiet van PHP te laag. Het bestand `.user.ini` in deze map zet hem op 10 MB. Werkt dat niet, zet dan in DirectAdmin bij *PHP-instellingen* (of *Select PHP version > Options*) `upload_max_filesize` op `10M` en `post_max_size` op `12M`.
+
 ## Nextcloud koppelen
 
 1. Maak in Nextcloud bij voorkeur een apart account, bijvoorbeeld `website`.
@@ -26,6 +30,19 @@ Een kleine website in PHP, zonder database. Draait op gewone webhosting (bijvoor
 4. Zet adres, gebruikersnaam, app-wachtwoord en de mapnaam in `config.php`.
 
 Wat in die map komt, staat meteen in het ledengedeelte. Bestanden toevoegen doe je gewoon in Nextcloud.
+
+## Inloggen met Nextcloud
+
+Leden kunnen ook inloggen met hun eigen Nextcloud-account in plaats van met het gezamenlijke ledenwachtwoord.
+
+1. Ga in Nextcloud als beheerder naar *Beheer > Beveiliging > OAuth 2.0-clients*.
+2. Naam: bijvoorbeeld `Website Wereldkoor`. Doorstuur-URL: het volledige adres van het ledengedeelte, precies zo, bijvoorbeeld `https://hansb.nl/wkh-website/leden` (later `https://www.wereldkoorhaarlem.com/leden`).
+3. Zet de Client-ID en het geheim in `config.php` bij `nextcloud_client_id` en `nextcloud_client_geheim`.
+4. Wil je alleen een bepaalde groep toelaten, zet de groepsnaam bij `nextcloud_groep`.
+
+Op de inlogpagina staat dan de knop *Inloggen met Nextcloud*. Laat je `leden_wachtwoord` op `verander-mij` staan, dan is dat de enige manier om in te loggen.
+
+De bestanden in het ledengedeelte komen nog steeds via het website-account (zie hierboven), zodat iedereen dezelfde ledenmap ziet. Na het inloggen trekt de website het tijdelijke Nextcloud-token meteen weer in.
 
 ## Tekst opmaken
 

@@ -2,7 +2,7 @@ Options -Indexes
 DirectoryIndex index.php
 
 # Instellingen, code en de opslag van de pagina's zijn niet los op te vragen
-<FilesMatch "^(config|lib|leden|beheer)\.php$|\.(json|lock|md)$">
+<FilesMatch "^(config|lib|leden|beheer)\.php$|^\.user\.ini$|\.(json|lock|md)$">
     Require all denied
 </FilesMatch>
 

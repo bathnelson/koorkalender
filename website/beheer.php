@@ -34,6 +34,11 @@ function fotoLijst(): array {
 
 $paginas = laadPaginas();
 $actie = ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' ? (string)($_POST['actie'] ?? '') : '';
+
+// Te groot voor de server (post_max_size): PHP gooit dan het hele formulier weg
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$_POST && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+    terug($hier . '?fotos=1', 'Deze foto is te groot voor de server (maximaal ' . ini_get('post_max_size') . '). Verklein hem eerst, of verhoog de limiet (zie README).', true);
+}
 $voorbeeld = null;
 $formulier = null; // ingevulde waarden die terug moeten in het formulier (bij voorbeeld of fout)
 
@@ -87,7 +92,9 @@ if ($actie !== '') {
     if ($actie === 'foto') {
         $f = $_FILES['foto'] ?? null;
         $fout = null;
-        if (!is_array($f) || is_array($f['error'] ?? null) || ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) $fout = 'Kies eerst een foto (en controleer dat hij kleiner is dan 8 MB).';
+        $code = is_array($f) && !is_array($f['error'] ?? null) ? (int)($f['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+        if ($code === UPLOAD_ERR_INI_SIZE || $code === UPLOAD_ERR_FORM_SIZE) $fout = 'Deze foto is te groot voor de server (maximaal ' . ini_get('upload_max_filesize') . '). Verklein hem eerst, of verhoog de limiet (zie README).';
+        elseif ($code !== UPLOAD_ERR_OK) $fout = 'Kies eerst een foto.';
         elseif ($f['size'] > MAX_FOTO) $fout = 'Deze foto is te groot (meer dan 8 MB).';
         else {
             $info = @getimagesize($f['tmp_name']);
@@ -128,7 +135,36 @@ $bewerk = $formulier['oud'] ?? (string)($_GET['bewerk'] ?? '');
 $nieuw = isset($_GET['nieuw']) || ($formulier !== null && $formulier['oud'] === '');
 
 if (isset($_GET['fotos'])) {
-    echo '<form method="post" enctype="multipart/form-data" class="kaart">' . $csrf . '<h2>Foto toevoegen</h2><input type="file" name="foto" accept="image/jpeg,image/png,image/gif,image/webp" required> <button name="actie" value="foto">Uploaden</button><p class="stil">Na het uploaden zie je hieronder de regel die je in een pagina plakt. Zet je meerdere foto-regels direct onder elkaar, dan worden ze een fotogalerij.</p></form>';
+    echo '<form method="post" enctype="multipart/form-data" class="kaart">' . $csrf . '<h2>Foto toevoegen</h2><input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/gif,image/webp" required> <button name="actie" value="foto" id="fotoknop">Uploaden</button><p class="stil">Grote foto\'s worden vóór het uploaden automatisch verkleind tot maximaal 1600 pixels breed. Na het uploaden zie je hieronder de regel die je in een pagina plakt. Zet je meerdere foto-regels direct onder elkaar, dan worden ze een fotogalerij.</p></form>';
+    echo <<<'JS'
+<script>
+// Verkleint grote foto's in de browser vóór het uploaden, zodat de uploadlimiet van de host geen probleem is
+(function () {
+  const veld = document.getElementById('foto'), knop = document.getElementById('fotoknop');
+  if (!veld || !window.DataTransfer || !HTMLCanvasElement.prototype.toBlob) return;
+  const MAX = 1600;
+  veld.addEventListener('change', async () => {
+    const f = veld.files[0];
+    if (!f || !/^image\/(jpeg|png|webp)$/.test(f.type)) return;
+    knop.disabled = true; knop.textContent = 'Verkleinen…';
+    try {
+      const img = await createImageBitmap(f, { imageOrientation: 'from-image' });
+      const schaal = Math.min(1, MAX / Math.max(img.width, img.height));
+      if (schaal === 1 && f.size < 1500000) return;
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * schaal); c.height = Math.round(img.height * schaal);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const blob = await new Promise(k => c.toBlob(k, 'image/jpeg', 0.82));
+      if (!blob) return;
+      const dt = new DataTransfer();
+      dt.items.add(new File([blob], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
+      veld.files = dt.files;
+    } catch (e) { /* lukt verkleinen niet, dan gaat het origineel */ }
+    finally { knop.disabled = false; knop.textContent = 'Uploaden'; }
+  });
+})();
+</script>
+JS;
     echo '<div class="fotobeheer">';
     foreach (fotoLijst() as $naam) {
         echo '<figure><img src="' . h(url('inhoud/fotos/' . $naam)) . '" alt="" loading="lazy"><figcaption><code>![](fotos/' . h($naam) . ')</code>'

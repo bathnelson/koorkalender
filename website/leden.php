@@ -13,11 +13,27 @@ if (($_POST['actie'] ?? '') === 'uitloggen') {
 
 $melding = probeerLogin('leden', $CONFIG);
 
+// Inloggen met Nextcloud
+if (ssoAan($CONFIG)) {
+    if (isset($_GET['sso'])) ssoStart($CONFIG);
+    if (isset($_GET['state'])) $melding = ssoTerug($CONFIG);
+}
+
 if (!ingelogd('leden')) {
+    $metWachtwoord = !in_array((string)($CONFIG['leden_wachtwoord'] ?? ''), ['', 'verander-mij'], true);
     kop($CONFIG, 'Leden', 'leden');
-    echo '<section class="inlog"><h1>Voor leden</h1><p>Log in met het ledenwachtwoord. Dat krijg je van het bestuur.</p>';
+    echo '<section class="inlog"><h1>Voor leden</h1>';
     if ($melding) echo '<p class="fout">' . h($melding) . '</p>';
-    echo '<form method="post"><label>Wachtwoord<input type="password" name="wachtwoord" autocomplete="current-password" required autofocus></label><button>Inloggen</button></form></section>';
+    if (ssoAan($CONFIG)) {
+        echo '<p>Log in met je Nextcloud-account van het koor.</p><p><a class="knop" href="' . h(url('leden') . '?sso=1') . '">Inloggen met Nextcloud</a></p>';
+        if ($metWachtwoord) echo '<p class="stil">Of met het gezamenlijke ledenwachtwoord:</p>';
+    } else {
+        echo '<p>Log in met het ledenwachtwoord. Dat krijg je van het bestuur.</p>';
+    }
+    if ($metWachtwoord || !ssoAan($CONFIG)) {
+        echo '<form method="post"><label>Wachtwoord<input type="password" name="wachtwoord" autocomplete="current-password" required' . (ssoAan($CONFIG) ? '' : ' autofocus') . '></label><button>Inloggen</button></form>';
+    }
+    echo '</section>';
     voet($CONFIG);
     exit;
 }
@@ -35,7 +51,8 @@ $tab = ($_GET['tab'] ?? '') === 'bestanden' || isset($_GET['map']) ? 'bestanden'
 $ledenUrl = url('leden');
 
 kop($CONFIG, 'Leden', 'leden');
-echo '<div class="ledenkop"><h1>Ledengedeelte</h1><form method="post"><input type="hidden" name="csrf" value="' . h(csrfToken()) . '"><button name="actie" value="uitloggen" class="licht">Uitloggen</button></form></div>';
+$naam = (string)($_SESSION['naam'] ?? '');
+echo '<div class="ledenkop"><h1>' . ($naam !== '' ? 'Welkom, ' . h($naam) : 'Ledengedeelte') . '</h1><form method="post"><input type="hidden" name="csrf" value="' . h(csrfToken()) . '"><button name="actie" value="uitloggen" class="licht">Uitloggen</button></form></div>';
 echo '<nav class="tabs"><a href="' . h($ledenUrl) . '"' . ($tab === 'kalender' ? ' class="actief"' : '') . '>Jaarkalender</a>';
 if (ncAan($CONFIG)) echo '<a href="' . h($ledenUrl . '?tab=bestanden') . '"' . ($tab === 'bestanden' ? ' class="actief"' : '') . '>Bestanden</a>';
 echo '</nav>';
