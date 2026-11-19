@@ -50,4 +50,9 @@ return [
     // Staat nextcloud_map leeg (''), dan zie je de hoofdmap van Nextcloud. Met true staan daar alleen de teammappen,
     // dus niet de eigen mappen van het lid zoals Documents en Photos.
     'nextcloud_alleen_teammappen' => true,
+
+    // Map in Nextcloud waar de fotokiezer in het beheer begint, bijvoorbeeld '7. media'. Leeg = de hoofdmap.
+    // De kiezer gebruikt het website-account hierboven, of het Nextcloud-account waarmee je in dit browservenster
+    // op de ledenpagina bent ingelogd. Een gekozen foto wordt verkleind naar de website gekopieerd.
+    'nextcloud_fotomap' => '',
 ];

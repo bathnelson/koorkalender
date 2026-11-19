@@ -511,6 +511,55 @@ function ncDownload(array $cfg, string $pad): void {
     }
 }
 
+// Volledig pad van een bestand in Nextcloud, gezien vanuit de hoofdmap van het account
+function ncVolledigPad(array $cfg, string $pad): string {
+    return '/' . trim(trim((string)$cfg['nextcloud_map'], '/') . '/' . $pad, '/');
+}
+
+// Haalt een bestand (of een voorbeeldplaatje) op uit Nextcloud. Geeft de inhoud terug, of null.
+function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 40 * 1024 * 1024): ?string {
+    $adres = $voorbeeld
+        ? rtrim($cfg['nextcloud_url'], '/') . '/index.php/core/preview.png?' . http_build_query(['file' => ncVolledigPad($cfg, $pad), 'x' => 300, 'y' => 300, 'a' => 1, 'forceIcon' => 0])
+        : ncAdres($cfg, $pad);
+    $c = ncCurl($cfg, $adres);
+    $data = '';
+    curl_setopt_array($c, [
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_WRITEFUNCTION => function ($c, $stuk) use (&$data, $max) {
+            $data .= $stuk;
+            return strlen($data) > $max ? 0 : strlen($stuk); // te groot: afbreken
+        },
+    ]);
+    $ok = curl_exec($c);
+    $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+    curl_close($c);
+    return $ok && $code === 200 && $data !== '' ? $data : null;
+}
+
+// Maakt een foto kleiner (langste kant $max pixels) als de server dat kan (GD). Draait hem ook rechtop.
+function verkleinFoto(string $bestand, int $max = 1600): void {
+    if (!function_exists('imagecreatefromstring')) return;
+    $info = @getimagesize($bestand);
+    if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) return;
+    if ($info[2] === IMAGETYPE_WEBP && !function_exists('imagewebp')) return;
+    $draai = 0;
+    if ($info[2] === IMAGETYPE_JPEG && function_exists('exif_read_data')) {
+        $exif = @exif_read_data($bestand);
+        $draai = [3 => 180, 6 => -90, 8 => 90][(int)($exif['Orientation'] ?? 1)] ?? 0;
+    }
+    if (max($info[0], $info[1]) <= $max && $draai === 0 && filesize($bestand) < 1500000) return;
+    $img = @imagecreatefromstring((string)file_get_contents($bestand));
+    if (!$img) return;
+    if ($draai) { $g = imagerotate($img, $draai, 0); if ($g) { imagedestroy($img); $img = $g; } }
+    $b = imagesx($img); $hg = imagesy($img);
+    $schaal = min(1, $max / max($b, $hg));
+    if ($schaal < 1) { $k = imagescale($img, (int)round($b * $schaal), (int)round($hg * $schaal)); if ($k) { imagedestroy($img); $img = $k; } }
+    if ($info[2] === IMAGETYPE_PNG) { imagesavealpha($img, true); imagepng($img, $bestand, 8); }
+    elseif ($info[2] === IMAGETYPE_WEBP && function_exists('imagewebp')) imagewebp($img, $bestand, 82);
+    else imagejpeg($img, $bestand, 82);
+    imagedestroy($img);
+}
+
 // ---------- Inloggen met Nextcloud (Login Flow v2, zit in elke Nextcloud) ----------
 //
 // 1. De website vraagt Nextcloud om een inlogpagina (login/v2) en opent die in een nieuw venster.

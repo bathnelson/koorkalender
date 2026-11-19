@@ -63,6 +63,10 @@ tegel: [Titel](pagina) fotos/naam.jpg
 
 Foto-regels direct onder elkaar worden een fotogalerij in metselwerk-stijl (masonry); een klik opent de foto groot, met pijltjes naar de volgende. Een video laat eerst alleen de miniatuur zien en laadt de speler pas na een klik. Tegel-regels onder elkaar worden een raster van tegels met plaatje en titel. HTML in de tekst werkt bewust niet.
 
+## Foto's kiezen
+
+In het beheer staat bij een pagina de knop **Foto invoegen** en bij een concert **Kies foto**. Je kiest dan uit de foto's op de website, uploadt een nieuwe, of bladert onder **Uit Nextcloud** door de foto's in Nextcloud. Een foto uit Nextcloud wordt verkleind (maximaal 1600 pixels) naar de website gekopieerd, zodat de site niet afhangt van Nextcloud. Met `nextcloud_fotomap` in `config.php` stel je de map in waar de kiezer begint. De kiezer gebruikt het website-account (`nextcloud_gebruiker`), of anders het Nextcloud-account waarmee je in hetzelfde browservenster op de ledenpagina bent ingelogd.
+
 ## Kopfoto
 
 In `config.php` zet je bij `kop_afbeelding` een webadres of `fotos/naam.jpg` (upload via Beheer > Foto's). Die foto staat breed bovenaan elke pagina.
