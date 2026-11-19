@@ -167,7 +167,7 @@ function standaardPaginas(): array {
 //   - opsomming                1. genummerd
 //   ![onderschrift](fotos/naam.jpg)   losse foto's onder elkaar worden een fotogalerij
 //   [![onderschrift](fotos/naam.jpg)](pagina-of-link)   foto die ergens naartoe linkt (anders: groot bekijken bij klikken)
-//   audio: [Titel](audio/naam.mp3)                 een geluidsspeler
+//   audio: [Titel](audio/naam.mp3) toelichting     een geluidsspeler; regels onder elkaar worden een speellijst
 //   youtube: https://www.youtube.com/watch?v=...   wordt een video (speler laadt pas na een klik)
 //   tegel: [Titel](pagina) https://youtube.../fotos/x.jpg   tegels onder elkaar worden een raster met plaatjes
 //   knop: [Kaartjes](https://...)                  wordt een knop
@@ -219,6 +219,12 @@ function opmaak(string $tekst): string {
         $galerij = [];
     };
 
+    $nummers = [];
+    $sluitNummers = function () use (&$uit, &$nummers) {
+        if (!$nummers) return;
+        $uit[] = '<ol class="speellijst' . (count($nummers) === 1 ? ' enkel' : '') . '">' . implode('', $nummers) . '</ol>';
+        $nummers = [];
+    };
     $sluitTegels = function () use (&$uit, &$tegels) {
         if (!$tegels) return;
         $uit[] = '<div class="tegels">' . implode('', $tegels) . '</div>';
@@ -227,7 +233,8 @@ function opmaak(string $tekst): string {
 
     foreach (preg_split('/\r\n|\r|\n/', $tekst) as $r) {
         $t = trim($r);
-        if ($t === '') { $sluitTekst(); $sluitGalerij(); $sluitTegels(); continue; }
+        if ($t === '') { $sluitTekst(); $sluitGalerij(); $sluitTegels(); $sluitNummers(); continue; }
+        if (stripos($t, 'audio:') !== 0) $sluitNummers();
 
         // tegel: [Titel](pagina) plaatje-of-youtube-adres
         if (preg_match('/^tegel:\s*\[([^\]]+)\]\(([^)\s]+)\)\s*(\S+)?$/i', $t, $m)) {
@@ -276,10 +283,16 @@ function opmaak(string $tekst): string {
             if ($id) $uit[] = '<div class="video"><a class="speel" href="https://www.youtube.com/watch?v=' . h($id) . '" data-yt="' . h($id) . '" target="_blank" rel="noopener" aria-label="Video afspelen"><img src="https://i.ytimg.com/vi/' . h($id) . '/hqdefault.jpg" alt="" loading="lazy"><span class="knopje">▶</span></a></div>';
             continue;
         }
-        if (preg_match('/^audio:\s*\[([^\]]*)\]\(([^)\s]+)\)$/i', $t, $m)) {
-            $sluitTekst();
+        // audio: [Titel](audio/naam.mp3) toelichting   -- regels onder elkaar worden een speellijst
+        if (preg_match('/^audio:\s*\[([^\]]*)\]\(([^)\s]+)\)\s*(.*)$/i', $t, $m)) {
+            $sluitTekst(); $sluitGalerij(); $sluitTegels();
             $adres = veiligAdres($m[2]);
-            if ($adres !== null && !preg_match('~^(mailto|tel):~i', $adres)) $uit[] = '<figure class="audio">' . ($m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '') . '<audio controls preload="none" src="' . h($adres) . '"></audio></figure>';
+            if ($adres !== null && !preg_match('~^(mailto|tel):~i', $adres)) {
+                $titel = $m[1] !== '' ? $m[1] : preg_replace('/\.\w+$/', '', basename($m[2]));
+                $nummers[] = '<li class="nummer"><div class="nummer-tekst"><span class="nummer-titel">' . h($titel) . '</span>'
+                    . ($m[3] !== '' ? '<span class="nummer-info">' . inline($m[3]) . '</span>' : '')
+                    . '</div><audio controls preload="metadata" src="' . h($adres) . '"></audio></li>';
+            }
             continue;
         }
         if (preg_match('/^knop:\s*\[([^\]]+)\]\(([^)\s]+)\)$/i', $t, $m)) {
@@ -307,6 +320,7 @@ function opmaak(string $tekst): string {
     $sluitTekst();
     $sluitGalerij();
     $sluitTegels();
+    $sluitNummers();
     return implode("\n", $uit);
 }
 

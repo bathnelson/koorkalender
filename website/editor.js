@@ -35,7 +35,7 @@
     fotolink: /^\[!\[([^\]]*)\]\(([^)\s]+)\)\]\(([^)\s]+)\)$/,
     video: /^youtube:\s*(\S+)$/i,
     knop: /^knop:\s*\[([^\]]+)\]\(([^)\s]+)\)$/i,
-    audio: /^audio:\s*\[([^\]]*)\]\(([^)\s]+)\)$/i,
+    audio: /^audio:\s*\[([^\]]*)\]\(([^)\s]+)\)\s*(.*)$/i,
     kop: /^(#{1,3})\s+(.*)$/
   };
   function leesTekst(tekst) {
@@ -51,7 +51,10 @@
         if (laatste && laatste.soort === 'fotos' && !leeg) laatste.items.push(f); else blokken.push({ soort: 'fotos', items: [f] });
       } else if ((m = RE.video.exec(t))) blokken.push({ soort: 'video', url: m[1] });
       else if ((m = RE.knop.exec(t))) blokken.push({ soort: 'knop', tekst: m[1], url: m[2] });
-      else if ((m = RE.audio.exec(t))) blokken.push({ soort: 'audio', titel: m[1], src: m[2] });
+      else if ((m = RE.audio.exec(t))) {
+        var nr = { titel: m[1], src: m[2], info: m[3] || '' };
+        if (laatste && laatste.soort === 'audio' && !leeg) laatste.items.push(nr); else blokken.push({ soort: 'audio', items: [nr] });
+      }
       else if ((m = RE.kop.exec(t))) blokken.push({ soort: 'kop', niveau: m[1].length, tekst: m[2] });
       else if (laatste && laatste.soort === 'tekst') laatste.md += (leeg ? '\n\n' : '\n') + t;
       else blokken.push({ soort: 'tekst', md: t });
@@ -68,7 +71,9 @@
         return f.link.trim() ? '[' + r + '](' + adres(f.link) + ')' : r;
       }).join('\n');
       if (b.soort === 'video') return b.url.trim() ? 'youtube: ' + adres(b.url) : '';
-      if (b.soort === 'audio') return b.src.trim() ? 'audio: [' + schoon(b.titel) + '](' + adres(b.src) + ')' : '';
+      if (b.soort === 'audio') return b.items.filter(function (a) { return a.src.trim(); }).map(function (a) {
+        return 'audio: [' + schoon(a.titel) + '](' + adres(a.src) + ')' + (a.info.trim() ? ' ' + a.info.replace(/\s+/g, ' ').trim() : '');
+      }).join('\n');
       if (b.soort === 'knop') return b.tekst.trim() && b.url.trim() ? 'knop: [' + schoon(b.tekst) + '](' + adres(b.url) + ')' : '';
       if (b.soort === 'tegels') return b.items.filter(function (t) { return t.titel.trim() && t.doel.trim(); }).map(function (t) {
         return 'tegel: [' + schoon(t.titel) + '](' + adres(t.doel) + ')' + (t.beeld.trim() ? ' ' + adres(t.beeld) : '');
@@ -203,7 +208,7 @@
     video: 'Plak de link uit YouTube (Delen → Kopiëren).',
     tegels: 'Een raster met plaatjes die naar een andere pagina gaan. Gebruik een YouTube-link of een foto voor het plaatje.',
     knop: 'Een opvallende knop, bijvoorbeeld voor kaartverkoop.',
-    audio: 'Een geluidsspeler. Kies een mp3 of m4a uit Nextcloud, of upload er een.'
+    audio: 'Eén nummer of een speellijst. Kies mp3- of m4a-bestanden uit Nextcloud, of upload ze. Sleep aan ⠿ om de volgorde te veranderen.'
   };
   var blokken = leesTekst(bron.value);
   var lijstEl = el('div', 'blokken');
@@ -225,7 +230,7 @@
     if (soort === 'fotos') return { soort: 'fotos', items: [] };
     if (soort === 'video') return { soort: 'video', url: '' };
     if (soort === 'tegels') return { soort: 'tegels', items: [] };
-    if (soort === 'audio') return { soort: 'audio', titel: '', src: '' };
+    if (soort === 'audio') return { soort: 'audio', items: [] };
     return { soort: 'knop', tekst: '', url: '' };
   }
 
@@ -357,23 +362,39 @@
   }
 
   function tekenAudio(b, lichaam) {
-    var rij = el('div', 'blok-rij');
-    var speler = el('audio'); speler.controls = true; speler.preload = 'none';
-    function toon() { var s = audioSrc(b.src); speler.hidden = !s; if (s && speler.getAttribute('src') !== s) speler.src = s; }
-    var bestand = invoer('Bestand', b.src, function (v) { b.src = v.trim(); toon(); }, { placeholder: 'audio/naam.mp3 of https://…' });
-    var kies = el('button', 'licht klein', '🎵 Kiezen'); kies.type = 'button';
-    kies.onclick = function () {
-      var nu = /^audio\/([\w.-]+)$/.exec(b.src || '');
-      window.kiesFotos({ soort: 'audio', meer: false, huidig: nu ? nu[1] : null }, function (namen) {
-        b.src = 'audio/' + namen[0];
-        if (!b.titel.trim()) b.titel = namen[0].replace(/\.\w+$/, '').replace(/[-_]+/g, ' ');
+    var lijst = el('div', 'nummerlijst');
+    var naarTitel = function (n) { return n.replace(/\.\w+$/, '').replace(/[-_]+/g, ' ').replace(/^\w/, function (c) { return c.toUpperCase(); }); };
+    b.items.forEach(function (a, i) {
+      var rij = el('div', 'ed-nummer'); rij.dataset.i = i;
+      var greep = el('span', 'nummer-greep', '⠿'); greep.title = 'Slepen om te verplaatsen';
+      var velden = el('div', 'nummer-velden');
+      var speler = el('audio'); speler.controls = true; speler.preload = 'none';
+      var s = audioSrc(a.src); if (s) speler.src = s; else speler.hidden = true;
+      var bestand = invoer('Bestand', a.src, function (v) { a.src = v.trim(); var z = audioSrc(a.src); speler.hidden = !z; if (z) speler.src = z; }, { placeholder: 'audio/naam.mp3 of https://…' });
+      var kies = el('button', 'licht klein', '🎵 Ander bestand'); kies.type = 'button';
+      kies.onclick = function () {
+        var nu = /^audio\/([\w.-]+)$/.exec(a.src || '');
+        window.kiesFotos({ soort: 'audio', meer: false, huidig: nu ? nu[1] : null }, function (namen) { a.src = 'audio/' + namen[0]; if (!a.titel.trim()) a.titel = naarTitel(namen[0]); bewaar(); teken(); });
+      };
+      bestand.appendChild(kies);
+      var rij2 = el('div', 'blok-rij');
+      rij2.append(invoer('Titel', a.titel, function (v) { a.titel = v; }), invoer('Toelichting (mag leeg)', a.info, function (v) { a.info = v; }, { placeholder: 'bijv. Georgië · opname 2024' }));
+      velden.append(rij2, bestand, speler);
+      var weg = el('button', 'kaartweg', '×'); weg.type = 'button'; weg.title = 'Nummer weghalen';
+      weg.onclick = function () { b.items.splice(i, 1); bewaar(); teken(); };
+      rij.append(greep, velden, weg);
+      lijst.appendChild(rij);
+    });
+    var plus = el('button', 'fotoplus nummerplus', '+ Nummers kiezen'); plus.type = 'button';
+    plus.onclick = function () {
+      window.kiesFotos({ soort: 'audio', meer: true }, function (namen) {
+        namen.forEach(function (n) { b.items.push({ titel: naarTitel(n), src: 'audio/' + n, info: '' }); });
         bewaar(); teken();
       });
     };
-    bestand.appendChild(kies);
-    rij.append(invoer('Titel (mag leeg)', b.titel, function (v) { b.titel = v; }), bestand);
-    lichaam.append(rij, speler);
-    toon();
+    lijst.appendChild(plus);
+    sorteerbaar(lijst, '.nummer-greep', false, function (v) { b.items = herorden(b.items, v); bewaar(); teken(); });
+    lichaam.appendChild(lijst);
   }
 
   function tekenKnop(b, lichaam) {
@@ -421,7 +442,7 @@
   sorteerbaar(lijstEl, '.blok-greep', false, function (v) { blokken = herorden(blokken, v); bewaar(); teken(); });
 
   // Knoppen om een blok toe te voegen; het soort pagina bepaalt welke vooraan staan
-  var VOORKEUR = { tekst: ['tekst', 'kop', 'fotos', 'video', 'audio', 'knop', 'tegels'], fotos: ['fotos', 'tekst', 'kop', 'video', 'audio', 'knop', 'tegels'], video: ['video', 'tekst', 'kop', 'audio', 'tegels', 'fotos', 'knop'], overzicht: ['tegels', 'tekst', 'kop', 'fotos', 'video', 'audio', 'knop'] };
+  var VOORKEUR = { tekst: ['tekst', 'kop', 'fotos', 'video', 'audio', 'knop', 'tegels'], fotos: ['fotos', 'tekst', 'kop', 'video', 'audio', 'knop', 'tegels'], video: ['video', 'tekst', 'kop', 'audio', 'tegels', 'fotos', 'knop'], overzicht: ['tegels', 'tekst', 'kop', 'fotos', 'video', 'audio', 'knop'], luisteren: ['audio', 'tekst', 'kop', 'fotos', 'video', 'knop', 'tegels'] };
   function tekenBalk() {
     balk.innerHTML = '';
     balk.appendChild(el('span', 'stil', 'Toevoegen:'));
@@ -429,7 +450,7 @@
       var k = el('button', n === 0 ? 'klein' : 'licht klein', '+ ' + NAMEN[s]); k.type = 'button';
       k.onclick = function () {
         blokken.push(nieuw(s)); bewaar(); teken(blokken.length - 1);
-        if (s === 'fotos') lijstEl.lastChild.querySelector('.fotoplus').click();
+        if (s === 'fotos' || s === 'audio') lijstEl.lastChild.querySelector('.fotoplus').click();
       };
       balk.appendChild(k);
     });
@@ -443,6 +464,7 @@
     if (s === 'fotos') b.push(nieuw('tekst'), nieuw('fotos'));
     else if (s === 'video') b.push(nieuw('video'), nieuw('tekst'));
     else if (s === 'overzicht') b.push(nieuw('tekst'), nieuw('tegels'));
+    else if (s === 'luisteren') b.push(nieuw('tekst'), nieuw('audio'));
     else b.push(nieuw('tekst'));
     return b;
   }

@@ -5,10 +5,11 @@ declare(strict_types=1);
 if (!isset($CONFIG)) { http_response_code(404); exit; }
 
 const MAX_FOTO = 8 * 1024 * 1024;
-const PAGINA_SOORTEN = ['tekst', 'fotos', 'video', 'overzicht'];
+const PAGINA_SOORTEN = ['tekst', 'fotos', 'video', 'luisteren', 'overzicht'];
 // Soort pagina raden voor pagina's van vóór de editor
 function raadSoort(string $tekst): string {
     if (preg_match('/^tegel:/mi', $tekst)) return 'overzicht';
+    if (preg_match('/^audio:/mi', $tekst)) return 'luisteren';
     if (preg_match('/^youtube:/mi', $tekst)) return 'video';
     if (preg_match_all('/^\[?!\[/m', $tekst) > 1) return 'fotos';
     return 'tekst';
@@ -458,7 +459,7 @@ if ($tabConcert && isset($_GET['concert'])) {
     echo '<label>Menu-item verwijst naar een andere website (leeg = deze pagina)<input type="url" name="link" value="' . h($w['link']) . '" placeholder="https://"></label>';
     $soort = in_array($w['soort'] ?? '', PAGINA_SOORTEN, true) ? $w['soort'] : ($w['oud'] === '' ? 'tekst' : raadSoort((string)$w['tekst']));
     echo '<label class="smal">Soort pagina<select name="soort" id="paginasoort">';
-    foreach (['tekst' => 'Tekst met kopjes en foto\'s', 'fotos' => 'Fotogalerij', 'video' => 'Video', 'overzicht' => 'Overzicht met tegels'] as $k => $l) echo '<option value="' . $k . '"' . ($soort === $k ? ' selected' : '') . '>' . h($l) . '</option>';
+    foreach (['tekst' => 'Tekst met kopjes en foto\'s', 'fotos' => 'Fotogalerij', 'video' => 'Video', 'luisteren' => 'Luisteren (speellijst)', 'overzicht' => 'Overzicht met tegels'] as $k => $l) echo '<option value="' . $k . '"' . ($soort === $k ? ' selected' : '') . '>' . h($l) . '</option>';
     echo '</select></label>';
     echo '<h3 class="inhoudkop">Inhoud</h3><div id="blokeditor" data-nieuw="' . ($w['oud'] === '' && $formulier === null ? '1' : '0') . '"></div>';
     echo '<div id="tekshulp"><div class="tekstkop"><label for="paginatekst">Tekst</label><button type="button" class="licht klein" data-fotokiezer="paginatekst">📷 Foto invoegen</button></div>';

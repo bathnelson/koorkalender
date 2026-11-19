@@ -242,10 +242,33 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .95
 .menulijst li.doel-erin { outline: 2px dashed var(--kleur); outline-offset: -3px; background: var(--kleur-licht); }
 .menulijst li.doel-erin::after { content: 'Loslaten: in het submenu'; font-size: .8rem; color: var(--kleur); white-space: nowrap; }
 
-/* ---- audio op de site ---- */
-.tekst figure.audio, figure.audio { margin: 1.2em 0; padding: 12px 14px; background: var(--kleur-licht); border-radius: 10px; }
-figure.audio figcaption { font-weight: 600; margin-bottom: 6px; }
-figure.audio audio { width: 100%; display: block; }
+/* ---- luisteren: speellijst ---- */
+.speellijst { list-style: none; margin: 1.4em 0; padding: 0; background: var(--kaart); border: 1px solid var(--lijn); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+.speellijst .nummer { display: flex; align-items: center; gap: 14px; padding: 14px 18px; }
+.speellijst .nummer + .nummer { border-top: 1px solid var(--lijn); }
+.speellijst .nummer-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.speellijst .nummer-titel { font-weight: 700; font-size: 1.05rem; }
+.speellijst .nummer-info { color: var(--stil); font-size: .9rem; }
+.speellijst audio { width: 100%; margin-top: 6px; }
+/* met JavaScript: eigen knoppen in plaats van de standaardspeler */
+.speellijst.verrijkt audio { display: none; }
+.speellijst .nummer.speelt { background: var(--kleur-licht); }
+.speelknop { flex: none; width: 48px; height: 48px; padding: 0; border-radius: 50%; background: var(--kaart); color: var(--accent); border: 2px solid var(--accent); display: flex; align-items: center; justify-content: center; position: relative; transition: background .15s, color .15s; }
+.speelknop .nr { font-weight: 700; font-size: 1rem; }
+.speelknop::after { content: ''; position: absolute; inset: 0; margin: auto; width: 0; height: 0; border-style: solid; border-width: 9px 0 9px 15px; border-color: transparent transparent transparent currentColor; transform: translateX(2px); opacity: 0; }
+.nummer:hover .speelknop, .speelknop:focus-visible, .nummer.speelt .speelknop { background: var(--accent); color: #fff; }
+.nummer:hover .speelknop .nr, .speelknop:focus-visible .nr, .nummer.speelt .speelknop .nr { opacity: 0; }
+.nummer:hover .speelknop::after, .speelknop:focus-visible::after { opacity: 1; }
+.nummer.speelt .speelknop::after { opacity: 1; width: 14px; height: 16px; border: 0; border-left: 5px solid #fff; border-right: 5px solid #fff; transform: none; }
+.nummer-balk { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.nummer-balk input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--accent) var(--p, 0%), var(--lijn) var(--p, 0%)); margin: 0; padding: 0; border: 0; cursor: pointer; }
+.nummer-balk input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+.nummer-balk input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 0; }
+.nummer-tijd { font-size: .8rem; color: var(--stil); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.speellijst.enkel .speelknop .nr { display: none; }
+.speellijst.enkel .speelknop::after { opacity: 1; }
+.speellijst.enkel .nummer:hover .speelknop::after { opacity: 1; }
+@media (max-width: 600px) { .speellijst .nummer { padding: 12px; gap: 10px; } .speelknop { width: 42px; height: 42px; } }
 
 /* ---- pagina-editor met blokken (beheer) ---- */
 .inhoudkop { margin: 1.4em 0 .4em; }
@@ -289,5 +312,12 @@ figure.audio audio { width: 100%; display: block; }
 .videovb { position: relative; width: 200px; aspect-ratio: 16 / 9; background: var(--kleur-licht); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: .85rem; }
 .videovb img { width: 100%; height: 100%; object-fit: cover; }
 .videovb .knopje { position: absolute; color: #fff; font-size: 1.6rem; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
-.blok-audio audio { width: 100%; margin-top: 10px; }
+.nummerlijst { display: flex; flex-direction: column; gap: 8px; }
+.ed-nummer { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--lijn); border-radius: 8px; padding: 8px 10px; background: var(--kaart); position: relative; }
+.ed-nummer.sleept { outline: 2px solid var(--kleur); box-shadow: 0 6px 20px rgba(0,0,0,.18); z-index: 2; }
+.nummer-greep { cursor: grab; color: var(--stil); font-size: 1.2rem; padding: 6px 2px; touch-action: none; user-select: none; }
+.nummer-velden { flex: 1; min-width: 0; }
+.nummer-velden audio { width: 100%; margin-top: 8px; height: 36px; }
+.ed-nummer .kaartweg { position: static; flex: none; }
+.nummerplus { min-height: 54px; }
 .blok-toevoegen { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 12px 0; padding: 10px; border: 2px dashed var(--lijn); border-radius: 10px; }
