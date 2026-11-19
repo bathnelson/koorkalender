@@ -230,7 +230,10 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .95
 .menulijst .greep { cursor: grab; padding: 12px 0 12px 14px; color: var(--stil); font-size: 1.2rem; touch-action: none; user-select: none; }
 .menulijst li[data-diepte="1"] { padding-left: 36px; background: color-mix(in srgb, var(--kleur-licht) 45%, var(--kaart)); }
 .menulijst li[data-diepte="1"] .greep::before { content: '↳ '; font-size: .9rem; }
+.menulijst li { cursor: grab; }
 .menulijst li.sleept { box-shadow: 0 6px 20px rgba(0,0,0,.18); position: relative; z-index: 2; background: var(--kaart); outline: 2px solid var(--kleur); }
 .menulijst li.meeverhuis { opacity: .6; }
 .bezig-slepen, .bezig-slepen * { cursor: grabbing !important; user-select: none; }
 #losselijst:empty::after { content: 'Alle pagina\'s staan in het menu.'; display: block; padding: 14px 16px; color: var(--stil); }
+.menulijst li.doel-erin { outline: 2px dashed var(--kleur); outline-offset: -3px; background: var(--kleur-licht); }
+.menulijst li.doel-erin::after { content: 'Loslaten: in het submenu'; font-size: .8rem; color: var(--kleur); white-space: nowrap; }

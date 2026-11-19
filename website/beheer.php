@@ -402,7 +402,7 @@ if ($tabConcert && isset($_GET['concert'])) {
     };
     echo '<p><a class="knop" href="' . h($hier . '?nieuw=1') . '">+ Nieuwe pagina</a></p>';
     echo '<div class="menukop"><h2>Menu</h2><span id="menustatus" class="stil" aria-live="polite"></span></div>';
-    echo '<p class="stil">Sleep een pagina aan ⠿ omhoog of omlaag voor de volgorde. Sleep naar rechts om hem in het submenu van de pagina erboven te zetten, en naar links om hem terug te zetten. Wijzigingen worden meteen bewaard.</p>';
+    echo '<p class="stil">Sleep een pagina aan ⠿ omhoog of omlaag voor de volgorde. Laat je hem los óp een menu-item, dan komt hij in het submenu daarvan. Naar links slepen haalt een pagina uit het submenu. Wijzigingen worden meteen bewaard.</p>';
     echo '<ul class="paginalijst menulijst" id="menulijst">';
     foreach ($inMenu as [$slug, $d]) echo $rij($slug, $d);
     echo '</ul><h2>Niet in het menu</h2><p class="stil">Deze pagina\'s zijn wel te bereiken via een link. Sleep er een naar boven om hem in het menu te zetten.</p><ul class="paginalijst menulijst" id="losselijst">';
