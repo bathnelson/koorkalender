@@ -124,7 +124,7 @@ figcaption { font-size: .85rem; color: var(--stil); padding-top: 4px; }
   .banner { display: none; }
   .kop .binnen { min-height: 52px; gap: 8px; }
   .kop.metbanner .binnen { justify-content: space-between; }
-  .minilogo { display: block; color: rgb(180, 58, 27); text-transform: uppercase; font-weight: 800; letter-spacing: .22em; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 56px); padding: 12px 0; }
+  .minilogo { display: block; flex: 1 1 0; min-width: 0; text-align: center; color: rgb(180, 58, 27); text-transform: uppercase; font-weight: 900; letter-spacing: .32em; font-size: clamp(1.4rem, 7.5vw, 2.1rem); line-height: 1.25; word-spacing: 100vw; padding: 14px 0 12px .32em; }
   .kop .logo:not(.minilogo) { font-size: 1.05rem; }
   .kop .logo span { display: none; }
   main.binnen { padding-top: 16px; }
