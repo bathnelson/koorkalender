@@ -44,6 +44,12 @@ Gebruiken jullie teammappen, zet `nextcloud_map` dan op `''` en `nextcloud_allee
 
 Let op: sluit een lid de browser zonder uit te loggen, dan blijft het app-wachtwoord in Nextcloud staan (Instellingen > Beveiliging > Apparaten & sessies, naam "Website Wereldkoor Haarlem"). Dat kan geen kwaad en het lid kan het daar weghalen. Logt een lid vaak met een verkeerd wachtwoord in, dan kan de beveiliging van Nextcloud het inloggen via de website tijdelijk vertragen.
 
+## Pagina's bewerken
+
+Een pagina bestaat uit blokken: **Kopje**, **Tekst** (met knoppen voor vet, schuin, link en lijstjes), **Foto's**, **Video** (plak de deellink uit YouTube), **Audio**, **Tegels** en **Knop**. Blokken en foto's verplaats je door te slepen. Bij een nieuwe pagina kies je eerst het **soort pagina** (tekst, fotogalerij, video, luisteren, overzicht met tegels); dat bepaalt met welke blokken de pagina begint en welke knoppen vooraan staan. Wie liever met tekstregels werkt, klikt op **Als tekst bewerken**. De pagina wordt in beide gevallen als tekst bewaard (zie hieronder).
+
+Een **luisterpagina** heeft een speellijst: audioregels onder elkaar worden één lijst met grote afspeelknoppen, titel, toelichting en een tijdbalk. Er speelt steeds één nummer, en na afloop begint vanzelf het volgende. Audiobestanden (mp3, m4a, ogg, wav, maximaal 40 MB) kies je uit Nextcloud of upload je; ze komen in `inhoud/audio/`. Grote bestanden kun je het beste via Nextcloud kiezen, dan speelt de uploadlimiet van de host geen rol.
+
 ## Tekst opmaken
 
 ```
@@ -55,17 +61,19 @@ Let op: sluit een lid de browser zonder uit te loggen, dan blijft het app-wachtw
 [tekst van de link](https://www.voorbeeld.nl)
 [naar een andere pagina](over-ons)
 ![onderschrift](fotos/naam.jpg)
+[![onderschrift](fotos/naam.jpg)](over-ons)
+audio: [Titel](audio/naam.mp3) toelichting (mag weg)
 youtube: https://www.youtube.com/watch?v=...
 knop: [Kaartjes kopen](https://...)
 tegel: [Titel](https://www.youtube.com/watch?v=...)
 tegel: [Titel](pagina) fotos/naam.jpg
 ```
 
-Foto-regels direct onder elkaar worden een fotogalerij in rijen van gelijke hoogte (masonry); een klik opent de foto groot, met pijltjes naar de volgende. Een video laat eerst alleen de miniatuur zien en laadt de speler pas na een klik. Tegel-regels onder elkaar worden een raster van tegels met plaatje en titel. HTML in de tekst werkt bewust niet.
+Foto-regels direct onder elkaar worden een fotogalerij in rijen van gelijke hoogte (masonry); een klik opent de foto groot, met pijltjes naar de volgende. Heeft een foto een link, dan gaat een klik naar die pagina of website. Een video laat eerst alleen de miniatuur zien en laadt de speler pas na een klik. Tegel-regels onder elkaar worden een raster van tegels met plaatje en titel. HTML in de tekst werkt bewust niet.
 
 ## Foto's kiezen
 
-In het beheer staat bij een pagina de knop **Foto invoegen** en bij een concert **Kies foto**. Je kiest dan uit de foto's op de website, uploadt een nieuwe, of bladert onder **Uit Nextcloud** door de foto's in Nextcloud. Een foto uit Nextcloud wordt verkleind (maximaal 1600 pixels) naar de website gekopieerd, zodat de site niet afhangt van Nextcloud. Met `nextcloud_fotomap` in `config.php` stel je de map in waar de kiezer begint. De kiezer gebruikt het website-account (`nextcloud_gebruiker`), of anders het Nextcloud-account waarmee je in hetzelfde browservenster op de ledenpagina bent ingelogd.
+In het beheer staat bij een pagina in het blok Foto's de knop **Foto's kiezen** en bij een concert **Kies foto**. Je kiest dan uit de foto's op de website, uploadt een nieuwe, of bladert onder **Uit Nextcloud** door de foto's in Nextcloud. Een foto uit Nextcloud wordt verkleind (maximaal 1600 pixels) naar de website gekopieerd, zodat de site niet afhangt van Nextcloud. Met `nextcloud_fotomap` in `config.php` stel je de map in waar de kiezer begint. De kiezer gebruikt het website-account (`nextcloud_gebruiker`), of anders het Nextcloud-account waarmee je in hetzelfde browservenster op de ledenpagina bent ingelogd.
 
 ## Subsidiegevers in de voettekst
 

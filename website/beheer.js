@@ -32,7 +32,7 @@
   }
 
   var knoppen = document.querySelectorAll('[data-fotokiezer]');
-  if (!knoppen.length) return;
+  if (!knoppen.length && !document.getElementById('blokeditor')) return;
 
   // De kiezer zelf
   var doos = document.createElement('dialog');
@@ -50,13 +50,24 @@
   var raster = doos.querySelector('.fk-raster'), ok = doos.querySelector('.fk-ok'), status = doos.querySelector('.fk-status');
   var onder = doos.querySelector('.fk-onder'), onderVeld = onder.querySelector('input'), uitleg = doos.querySelector('.fk-uitleg');
   var upload = doos.querySelector('input[type=file]');
-  var doel = null, meer = false, gekozen = [];
+  var doel = null, meer = false, gekozen = [], terugroep = null, metOnder = true;
   var tabs = doos.querySelector('.fk-tabs'), ncDeel = doos.querySelector('.fk-nc'), ncRaster = doos.querySelector('.fk-ncraster'), ncPad = doos.querySelector('.fk-pad');
   var ncMap = null;
+  var modus = 'foto'; // of 'audio'
+  data.audio = data.audio || [];
+  function lijstNu() { return modus === 'audio' ? data.audio : data.fotos; }
 
+  // Antwoord van de server lezen; is het geen JSON (bijv. een foutpagina van de host), zeg dan wat er wel kwam
+  async function leesJson(antw) {
+    var t = await antw.text();
+    try { return JSON.parse(t); } catch (e) {
+      var kaal = t.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      throw new Error('De server gaf een onverwacht antwoord (HTTP ' + antw.status + ')' + (kaal ? ': ' + kaal : ', leeg.'));
+    }
+  }
   function zeg(t, fout) { status.hidden = !t; status.textContent = t || ''; status.className = 'fk-status ' + (fout ? 'fout' : 'stil'); }
   function bijwerken() {
-    onder.hidden = !meer || gekozen.length > 1;
+    onder.hidden = !metOnder || !meer || gekozen.length > 1;
     raster.querySelectorAll('button').forEach(function (b) {
       var i = gekozen.indexOf(b.dataset.naam);
       b.classList.toggle('gekozen', i >= 0);
@@ -68,8 +79,13 @@
   function tegel(f, vooraan) {
     var b = document.createElement('button');
     b.type = 'button'; b.dataset.naam = f.naam; b.title = f.naam;
-    b.innerHTML = '<img alt="" loading="lazy"><span class="nr"></span>';
-    b.querySelector('img').src = f.src;
+    if (modus === 'audio') {
+      b.innerHTML = '<span class="mapinhoud"><span class="mapikoon">🎵</span><span class="mapnaam"></span></span><span class="nr"></span>';
+      b.querySelector('.mapnaam').textContent = f.naam;
+    } else {
+      b.innerHTML = '<img alt="" loading="lazy"><span class="nr"></span>';
+      b.querySelector('img').src = f.src;
+    }
     b.addEventListener('click', function () {
       var i = gekozen.indexOf(f.naam);
       if (i >= 0) gekozen.splice(i, 1);
@@ -80,8 +96,8 @@
     b.addEventListener('dblclick', function () { if (!meer) { gekozen = [f.naam]; doos.close('ja'); } });
     if (vooraan) raster.prepend(b); else raster.appendChild(b);
   }
-  data.fotos.forEach(function (f) { tegel(f, false); });
-  if (!data.fotos.length) zeg('Er zijn nog geen foto\'s. Upload er hierboven een.');
+  function vulRaster() { raster.innerHTML = ''; lijstNu().forEach(function (f) { tegel(f, false); }); }
+  vulRaster();
 
   // ---- Nextcloud ----
   function toonTab(welke) {
@@ -90,7 +106,7 @@
     zeg('');
     try { localStorage.setItem('fk-tab', welke); } catch (e) {}
     if (welke === 'nc' && ncMap === null) {
-      var m = ''; try { m = localStorage.getItem('fk-ncmap') || ''; } catch (e) {}
+      var m = ''; try { m = localStorage.getItem('fk-ncmap' + (modus === 'audio' ? '-audio' : '')) || ''; } catch (e) {}
       laadNc(m);
     }
   }
@@ -100,9 +116,11 @@
   }
   async function laadNc(map) {
     zeg('Nextcloud wordt geladen…');
-    ncRaster.innerHTML = '';
+    ncRaster.innerHTML = ''; kapotGemeld = false;
+    var mijn = laadNc.teller = (laadNc.teller || 0) + 1;
     try {
-      var r = await (await fetch(data.nc + '?ncfotos=1&map=' + encodeURIComponent(map), { credentials: 'same-origin' })).json();
+      var r = await leesJson(await fetch(data.nc + '?ncfotos=1&soort=' + modus + '&map=' + encodeURIComponent(map), { credentials: 'same-origin' }));
+      if (mijn !== laadNc.teller) return; // intussen al een andere map gekozen
       if (r.fout && map && !r.inlog) return laadNc('');
       if (r.fout) {
         zeg(r.fout, true);
@@ -115,7 +133,7 @@
         return;
       }
       ncMap = r.map;
-      try { localStorage.setItem('fk-ncmap', ncMap); } catch (e) {}
+      try { localStorage.setItem('fk-ncmap' + (modus === 'audio' ? '-audio' : ''), ncMap); } catch (e) {}
       // kruimelpad
       ncPad.innerHTML = '';
       var delen = ncMap ? ncMap.split('/') : [];
@@ -129,7 +147,7 @@
       });
       r.mappen.forEach(function (m) {
         var b = document.createElement('button'); b.type = 'button'; b.className = 'map';
-        b.innerHTML = '<span class="mapikoon">📁</span><span class="mapnaam"></span>';
+        b.innerHTML = '<span class="mapinhoud"><span class="mapikoon">📁</span><span class="mapnaam"></span></span>';
         b.querySelector('.mapnaam').textContent = m;
         b.onclick = function () { laadNc(ncMap ? ncMap + '/' + m : m); };
         ncRaster.appendChild(b);
@@ -137,14 +155,30 @@
       r.fotos.forEach(function (f) {
         var pad = ncMap ? ncMap + '/' + f : f;
         var b = document.createElement('button'); b.type = 'button'; b.title = f;
-        b.innerHTML = '<img alt="" loading="lazy"><span class="nr"></span><span class="fotonaam"></span>';
-        b.querySelector('img').src = data.nc + '?ncvoorbeeld=' + encodeURIComponent(pad);
-        b.querySelector('.fotonaam').textContent = f;
+        if (modus === 'audio') {
+          b.innerHTML = '<span class="mapinhoud"><span class="mapikoon">🎵</span><span class="mapnaam"></span></span><span class="nr"></span>';
+          b.querySelector('.mapnaam').textContent = f;
+        } else {
+          b.innerHTML = '<img alt="" loading="lazy"><span class="nr"></span><span class="fotonaam"></span>';
+          var vb = b.querySelector('img');
+          vb.onerror = function () { b.classList.add('kapot'); meldKapot(pad); };
+          vb.src = data.nc + '?ncvoorbeeld=' + encodeURIComponent(pad);
+          b.querySelector('.fotonaam').textContent = f;
+        }
         b.onclick = function () { haalNc(b, pad); };
         ncRaster.appendChild(b);
       });
-      zeg(r.mappen.length || r.fotos.length ? '' : 'Geen foto\'s in deze map.');
-    } catch (e) { zeg(e.message && e.message.indexOf('JSON') < 0 ? e.message : 'Nextcloud is niet bereikbaar.', true); }
+      zeg(r.mappen.length || r.fotos.length ? '' : (modus === 'audio' ? 'Geen audiobestanden in deze map.' : 'Geen foto\'s in deze map.'));
+    } catch (e) { zeg(e.message ? e.message : 'Nextcloud is niet bereikbaar.', true); }
+  }
+  // Laden de voorbeeldjes niet, dan één keer een melding met een link die laat zien waarom
+  var kapotGemeld = false;
+  function meldKapot(pad) {
+    if (kapotGemeld) return;
+    kapotGemeld = true;
+    zeg('Sommige voorbeeldjes laden niet. Je kunt ze wel kiezen. ', true);
+    var l = document.createElement('a'); l.href = data.nc + '?ncvoorbeeld=' + encodeURIComponent(pad) + '&waarom=1'; l.target = '_blank'; l.textContent = 'Waarom?';
+    status.appendChild(l);
   }
   // Een foto uit Nextcloud wordt naar de website gekopieerd (verkleind) en dan gekozen
   async function haalNc(b, pad) {
@@ -154,14 +188,15 @@
     try {
       var fd = new FormData();
       fd.append('csrf', data.csrf); fd.append('actie', 'nc_foto'); fd.append('pad', pad);
-      var r = await (await fetch(data.upload, { method: 'POST', body: fd, credentials: 'same-origin' })).json();
+      var r = await leesJson(await fetch(data.upload, { method: 'POST', body: fd, credentials: 'same-origin' }));
       if (!r.naam) throw new Error(r.fout || 'Kopiëren lukte niet.');
+      lijstNu().unshift(r);
       tegel(r, true);
       if (meer) gekozen.push(r.naam); else gekozen = [r.naam];
       b.classList.add('gekozen'); b.querySelector('.nr').textContent = '✓';
       bijwerken();
       zeg(meer ? 'Gekopieerd. Kies er nog meer, of klik op Invoegen.' : 'Gekopieerd. Klik op Kiezen.');
-    } catch (e) { b.querySelector('.nr').textContent = ''; zeg(e.message && e.message.indexOf('JSON') < 0 ? e.message : 'Kopiëren lukte niet.', true); }
+    } catch (e) { b.querySelector('.nr').textContent = ''; zeg(e.message ? e.message : 'Kopiëren lukte niet.', true); }
     b.classList.remove('bezig');
   }
 
@@ -171,20 +206,24 @@
       zeg('Bezig met uploaden (' + (n + 1) + ' van ' + lijst.length + ')…');
       try {
         var fd = new FormData();
-        fd.append('csrf', data.csrf); fd.append('actie', 'foto');
-        fd.append('foto', await verklein(lijst[n]));
-        var r = await (await fetch(data.upload, { method: 'POST', body: fd, credentials: 'same-origin' })).json();
+        fd.append('csrf', data.csrf); fd.append('actie', modus);
+        fd.append(modus, modus === 'audio' ? lijst[n] : await verklein(lijst[n]));
+        var r = await leesJson(await fetch(data.upload, { method: 'POST', body: fd, credentials: 'same-origin' }));
         if (!r.naam) throw new Error(r.fout || 'Uploaden lukte niet.');
+        lijstNu().unshift(r);
         tegel(r, true);
         if (meer) gekozen.push(r.naam); else gekozen = [r.naam];
         bijwerken();
-      } catch (e) { zeg(e.message && e.message.indexOf('JSON') < 0 ? e.message : 'Uploaden lukte niet. Probeer het via het tabblad Foto\'s.', true); upload.value = ''; return; }
+      } catch (e) { zeg(e.message ? e.message : 'Uploaden lukte niet. Probeer het via het tabblad Foto\'s.', true); upload.value = ''; return; }
     }
     zeg(''); upload.value = '';
   });
 
   doos.addEventListener('close', function () {
-    if (doos.returnValue !== 'ja' || !gekozen.length || !doel) return;
+    var cb = terugroep; terugroep = null;
+    if (doos.returnValue !== 'ja' || !gekozen.length) return;
+    if (cb) { cb(gekozen.slice(), onderVeld.value.replace(/[\[\]\n]/g, ' ').trim()); return; }
+    if (!doel) return;
     if (doel.tagName === 'TEXTAREA') {
       var tekst = onderVeld.value.replace(/[\[\]\n]/g, ' ').trim();
       var regels = gekozen.map(function (n) { return '![' + (gekozen.length === 1 ? tekst : '') + '](fotos/' + n + ')'; });
@@ -200,6 +239,32 @@
       doel.dispatchEvent(new Event('input'));
     }
   });
+
+  function openKiezer(veld, veelKeuze, huidig, soort) {
+    soort = soort || 'foto';
+    if (soort !== modus) {
+      modus = soort; ncMap = null; vulRaster();
+      upload.accept = modus === 'audio' ? 'audio/*,.mp3,.m4a,.ogg,.wav' : 'image/jpeg,image/png,image/gif,image/webp';
+      upload.parentNode.firstChild.textContent = modus === 'audio' ? 'Nieuw bestand uploaden' : 'Nieuwe foto uploaden';
+    }
+    doel = veld; meer = veelKeuze;
+    gekozen = huidig ? [huidig] : [];
+    onderVeld.value = '';
+    doos.querySelector('h2').textContent = modus === 'audio' ? 'Kies een audiobestand' : meer ? "Kies een of meer foto's" : 'Kies een foto';
+    ok.textContent = meer ? 'Invoegen' : 'Kiezen';
+    zeg(raster.children.length ? '' : (modus === 'audio' ? 'Er staan nog geen audiobestanden op de website. Upload er een, of kies er een uit Nextcloud.' : 'Er zijn nog geen foto\'s. Upload er hierboven een.'));
+    bijwerken();
+    ncRaster.querySelectorAll('.gekozen').forEach(function (b) { b.classList.remove('gekozen'); b.querySelector('.nr').textContent = ''; });
+    var tab = 'site'; try { tab = localStorage.getItem('fk-tab') || 'site'; } catch (e) {}
+    toonTab(data.nc && tab === 'nc' ? 'nc' : 'site');
+    doos.showModal();
+  }
+  // Voor de pagina-editor: kiesFotos({ meer: true }, function (namen, onderschrift) { ... })
+  window.kiesFotos = function (opties, klaar) {
+    metOnder = !!opties.onderschrift;
+    openKiezer(null, !!opties.meer, opties.huidig || null, opties.soort);
+    terugroep = klaar;
+  };
 
   knoppen.forEach(function (k) {
     var veld = document.getElementById(k.dataset.fotokiezer);
@@ -219,18 +284,9 @@
       toon();
     }
     k.addEventListener('click', function () {
-      doel = veld; meer = veld.tagName === 'TEXTAREA';
       var w = veld.value.trim().match(/^fotos\/([\w.-]+)$/);
-      gekozen = !meer && w ? [w[1]] : [];
-      onderVeld.value = '';
-      doos.querySelector('h2').textContent = meer ? "Kies een of meer foto's" : 'Kies een foto';
-      ok.textContent = meer ? 'Invoegen' : 'Kiezen';
-      zeg(data.fotos.length || raster.children.length ? '' : 'Er zijn nog geen foto\'s. Upload er hierboven een.');
-      bijwerken();
-      ncRaster.querySelectorAll('.gekozen').forEach(function (b) { b.classList.remove('gekozen'); b.querySelector('.nr').textContent = ''; });
-      var tab = 'site'; try { tab = localStorage.getItem('fk-tab') || 'site'; } catch (e) {}
-      toonTab(data.nc && tab === 'nc' ? 'nc' : 'site');
-      doos.showModal();
+      metOnder = true;
+      openKiezer(veld, veld.tagName === 'TEXTAREA', veld.tagName !== 'TEXTAREA' && w ? w[1] : null, 'foto');
     });
   });
 })();

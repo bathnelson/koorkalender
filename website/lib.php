@@ -9,6 +9,8 @@ date_default_timezone_set('Europe/Amsterdam');
 const INHOUD_DIR = __DIR__ . '/inhoud';
 const PAGINAS_FILE = INHOUD_DIR . '/paginas.json';
 const FOTO_DIR = INHOUD_DIR . '/fotos';
+const AUDIO_DIR = INHOUD_DIR . '/audio';
+const AUDIO_EXT = '/\.(mp3|m4a|aac|ogg|oga|opus|wav)$/i';
 const BACKUP_DIR = INHOUD_DIR . '/backup';
 const MAX_BACKUPS = 50;
 const INSTELLINGEN_FILE = INHOUD_DIR . '/instellingen.json';
@@ -164,6 +166,8 @@ function standaardPaginas(): array {
 //   # Kop, ## Kleinere kop     **vet**   *schuin*   [tekst](https://link)
 //   - opsomming                1. genummerd
 //   ![onderschrift](fotos/naam.jpg)   losse foto's onder elkaar worden een fotogalerij
+//   [![onderschrift](fotos/naam.jpg)](pagina-of-link)   foto die ergens naartoe linkt (anders: groot bekijken bij klikken)
+//   audio: [Titel](audio/naam.mp3) toelichting     een geluidsspeler; regels onder elkaar worden een speellijst
 //   youtube: https://www.youtube.com/watch?v=...   wordt een video (speler laadt pas na een klik)
 //   tegel: [Titel](pagina) https://youtube.../fotos/x.jpg   tegels onder elkaar worden een raster met plaatjes
 //   knop: [Kaartjes](https://...)                  wordt een knop
@@ -174,7 +178,7 @@ function veiligAdres(string $u): ?string {
     $u = trim($u);
     if (preg_match('~^(https?://|mailto:|tel:)~i', $u)) return $u;
     if (preg_match('~^(/|#)~', $u) && strpos($u, '//') !== 0) return $u;
-    if (preg_match('~^fotos/[A-Za-z0-9._-]+$~', $u)) return url('inhoud/' . $u);
+    if (preg_match('~^(fotos|audio)/[A-Za-z0-9._-]+$~', $u)) return url('inhoud/' . $u);
     if (preg_match('~^[a-z0-9-]+$~', $u)) return paginaUrl($u);
     return null;
 }
@@ -215,6 +219,12 @@ function opmaak(string $tekst): string {
         $galerij = [];
     };
 
+    $nummers = [];
+    $sluitNummers = function () use (&$uit, &$nummers) {
+        if (!$nummers) return;
+        $uit[] = '<ol class="speellijst' . (count($nummers) === 1 ? ' enkel' : '') . '">' . implode('', $nummers) . '</ol>';
+        $nummers = [];
+    };
     $sluitTegels = function () use (&$uit, &$tegels) {
         if (!$tegels) return;
         $uit[] = '<div class="tegels">' . implode('', $tegels) . '</div>';
@@ -223,7 +233,8 @@ function opmaak(string $tekst): string {
 
     foreach (preg_split('/\r\n|\r|\n/', $tekst) as $r) {
         $t = trim($r);
-        if ($t === '') { $sluitTekst(); $sluitGalerij(); $sluitTegels(); continue; }
+        if ($t === '') { $sluitTekst(); $sluitGalerij(); $sluitTegels(); $sluitNummers(); continue; }
+        if (stripos($t, 'audio:') !== 0) $sluitNummers();
 
         // tegel: [Titel](pagina) plaatje-of-youtube-adres
         if (preg_match('/^tegel:\s*\[([^\]]+)\]\(([^)\s]+)\)\s*(\S+)?$/i', $t, $m)) {
@@ -246,16 +257,20 @@ function opmaak(string $tekst): string {
         }
         $sluitTegels();
 
-        // foto: ![onderschrift](fotos/naam.jpg)
-        if (preg_match('/^!\[([^\]]*)\]\(([^)\s]+)\)$/', $t, $m)) {
+        // foto: ![onderschrift](fotos/naam.jpg), of met een link eromheen: [![onderschrift](fotos/naam.jpg)](pagina)
+        if (preg_match('/^!\[([^\]]*)\]\(([^)\s]+)\)$/', $t, $m) || preg_match('/^\[!\[([^\]]*)\]\(([^)\s]+)\)\]\(([^)\s]+)\)$/', $t, $m)) {
             $sluitTekst();
             $adres = veiligAdres($m[2]);
+            $doel = isset($m[3]) ? veiligAdres($m[3]) : null;
             if ($adres !== null) {
                 $onder = $m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '';
                 // Bij eigen foto's de verhouding meegeven, zodat de galerij meteen goed staat
                 $maat = preg_match('~^fotos/([A-Za-z0-9._-]+)$~', $m[2], $f) ? @getimagesize(FOTO_DIR . '/' . $f[1]) : false;
                 $r = $maat && $maat[1] > 0 ? round($maat[0] / $maat[1], 3) : null;
-                $galerij[] = '<figure' . ($r ? ' style="--r:' . $r . '"' : '') . '><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '"'
+                $a = $doel !== null
+                    ? '<a class="doorlink" href="' . h($doel) . '"' . (preg_match('~^https?://~i', $doel) ? ' target="_blank" rel="noopener"' : '') . '>'
+                    : '<a href="' . h($adres) . '">';
+                $galerij[] = '<figure' . ($r ? ' style="--r:' . $r . '"' : '') . '>' . $a . '<img src="' . h($adres) . '" alt="' . h($m[1]) . '"'
                     . ($maat ? ' width="' . (int)$maat[0] . '" height="' . (int)$maat[1] . '"' : '') . ' loading="lazy"></a>' . $onder . '</figure>';
             }
             continue;
@@ -266,6 +281,18 @@ function opmaak(string $tekst): string {
             $sluitTekst();
             $id = youtubeId($m[1]);
             if ($id) $uit[] = '<div class="video"><a class="speel" href="https://www.youtube.com/watch?v=' . h($id) . '" data-yt="' . h($id) . '" target="_blank" rel="noopener" aria-label="Video afspelen"><img src="https://i.ytimg.com/vi/' . h($id) . '/hqdefault.jpg" alt="" loading="lazy"><span class="knopje">▶</span></a></div>';
+            continue;
+        }
+        // audio: [Titel](audio/naam.mp3) toelichting   -- regels onder elkaar worden een speellijst
+        if (preg_match('/^audio:\s*\[([^\]]*)\]\(([^)\s]+)\)\s*(.*)$/i', $t, $m)) {
+            $sluitTekst(); $sluitGalerij(); $sluitTegels();
+            $adres = veiligAdres($m[2]);
+            if ($adres !== null && !preg_match('~^(mailto|tel):~i', $adres)) {
+                $titel = $m[1] !== '' ? $m[1] : preg_replace('/\.\w+$/', '', basename($m[2]));
+                $nummers[] = '<li class="nummer"><div class="nummer-tekst"><span class="nummer-titel">' . h($titel) . '</span>'
+                    . ($m[3] !== '' ? '<span class="nummer-info">' . inline($m[3]) . '</span>' : '')
+                    . '</div><audio controls preload="metadata" src="' . h($adres) . '"></audio></li>';
+            }
             continue;
         }
         if (preg_match('/^knop:\s*\[([^\]]+)\]\(([^)\s]+)\)$/i', $t, $m)) {
@@ -293,6 +320,7 @@ function opmaak(string $tekst): string {
     $sluitTekst();
     $sluitGalerij();
     $sluitTegels();
+    $sluitNummers();
     return implode("\n", $uit);
 }
 
@@ -539,7 +567,7 @@ function ncVolledigPad(array $cfg, string $pad): string {
 }
 
 // Haalt een bestand (of een voorbeeldplaatje) op uit Nextcloud. Geeft de inhoud terug, of null.
-function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 40 * 1024 * 1024): ?string {
+function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 40 * 1024 * 1024, ?array &$status = null): ?string {
     $adres = $voorbeeld
         ? rtrim($cfg['nextcloud_url'], '/') . '/index.php/core/preview.png?' . http_build_query(['file' => ncVolledigPad($cfg, $pad), 'x' => 300, 'y' => 300, 'a' => 1, 'forceIcon' => 0])
         : ncAdres($cfg, $pad);
@@ -554,8 +582,40 @@ function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 
     ]);
     $ok = curl_exec($c);
     $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+    $status = ['http' => $code, 'fout' => curl_error($c), 'bytes' => strlen($data), 'te_groot' => strlen($data) > $max];
     curl_close($c);
     return $ok && $code === 200 && $data !== '' ? $data : null;
+}
+
+// Grote foto's (bijv. 12 megapixel van een telefoon) hebben veel geheugen nodig om te verkleinen.
+// Vraag zo nodig meer geheugen; lukt dat niet, dan geeft dit false (en slaan we het verkleinen over).
+function genoegGeheugen(int $breed, int $hoog): bool {
+    $nodig = (int)($breed * $hoog * 4 * 2.2) + memory_get_usage() + 16 * 1024 * 1024;
+    $naarBytes = function (string $w): int {
+        $w = trim($w);
+        if ($w === '' || $w === '-1') return PHP_INT_MAX;
+        $n = (int)$w; $e = strtolower(substr($w, -1));
+        return $e === 'g' ? $n << 30 : ($e === 'm' ? $n << 20 : ($e === 'k' ? $n << 10 : $n));
+    };
+    if ($naarBytes((string)ini_get('memory_limit')) >= $nodig) return true;
+    @ini_set('memory_limit', (string)max(256, (int)ceil($nodig / 1048576) + 32) . 'M');
+    return $naarBytes((string)ini_get('memory_limit')) >= $nodig;
+}
+
+// Maakt een klein vierkant plaatje (jpg) van een foto, voor de fotokiezer. Geeft null als het niet lukt.
+function maakMiniatuur(string $data, int $maat = 300): ?string {
+    if (!function_exists('imagecreatefromstring')) return null;
+    $info = @getimagesizefromstring($data);
+    if (!$info || !genoegGeheugen((int)$info[0], (int)$info[1])) return null;
+    $img = @imagecreatefromstring($data);
+    if (!$img) return null;
+    $b = imagesx($img); $h = imagesy($img); $z = min($b, $h);
+    $k = imagecreatetruecolor($maat, $maat);
+    imagecopyresampled($k, $img, 0, 0, (int)(($b - $z) / 2), (int)(($h - $z) / 2), $maat, $maat, $z, $z);
+    imagedestroy($img);
+    ob_start(); imagejpeg($k, null, 78); $uit = (string)ob_get_clean();
+    imagedestroy($k);
+    return $uit !== '' ? $uit : null;
 }
 
 // Maakt een foto kleiner (langste kant $max pixels) als de server dat kan (GD). Draait hem ook rechtop.
@@ -570,6 +630,7 @@ function verkleinFoto(string $bestand, int $max = 1600): void {
         $draai = [3 => 180, 6 => -90, 8 => 90][(int)($exif['Orientation'] ?? 1)] ?? 0;
     }
     if (max($info[0], $info[1]) <= $max && $draai === 0 && filesize($bestand) < 1500000) return;
+    if (!genoegGeheugen((int)$info[0], (int)$info[1])) return;
     $img = @imagecreatefromstring((string)file_get_contents($bestand));
     if (!$img) return;
     if ($draai) { $g = imagerotate($img, $draai, 0); if ($g) { imagedestroy($img); $img = $g; } }
@@ -719,7 +780,8 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
     // Met een kopfoto staat de naam van het koor over de foto heen; anders links in de menubalk
     $logo = '<a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
     if ($banner) echo '<div class="banner"><img src="' . h($banner) . '" alt="">' . $logo . '</div>';
-    echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '' : $logo);
+    // Met kopfoto staat de naam groot op de foto; op de telefoon verdwijnt de foto en staat de naam klein in de menubalk
+    echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '<a class="logo minilogo" href="' . h(url()) . '">' . h($cfg['naam']) . '</a>' : $logo);
     if ($menuTonen) {
         echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
         // Submenu's: pagina's met 'onder' komen in een uitklapmenu onder die pagina

@@ -48,9 +48,59 @@
     toon();
   }
   document.querySelectorAll('.galerij, .foto').forEach(function (g) {
-    var links = Array.prototype.slice.call(g.querySelectorAll('figure > a'));
+    var links = Array.prototype.slice.call(g.querySelectorAll('figure > a:not(.doorlink)'));
     links.forEach(function (a, i) {
       a.addEventListener('click', function (e) { e.preventDefault(); open(links, i); });
+    });
+  });
+
+  // Luisteren: een eigen, rustige speler per nummer. Er speelt er steeds één; na afloop begint het volgende nummer.
+  function tijd(s) { if (!isFinite(s)) return '–:––'; s = Math.floor(s); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+  var alleSpelers = [];
+  document.querySelectorAll('ol.speellijst').forEach(function (lijst) {
+    lijst.classList.add('verrijkt');
+    var rijen = Array.prototype.slice.call(lijst.querySelectorAll('li.nummer'));
+    rijen.forEach(function (li, i) {
+      var audio = li.querySelector('audio');
+      if (!audio) return;
+      alleSpelers.push(audio);
+      audio.controls = false;
+      var knop = document.createElement('button');
+      knop.type = 'button'; knop.className = 'speelknop';
+      var titel = li.querySelector('.nummer-titel');
+      knop.setAttribute('aria-label', 'Afspelen: ' + (titel ? titel.textContent : 'nummer'));
+      knop.innerHTML = '<span class="nr">' + (i + 1) + '</span>';
+      li.insertBefore(knop, li.firstChild);
+      var balk = document.createElement('div'); balk.className = 'nummer-balk';
+      var schuif = document.createElement('input'); schuif.type = 'range'; schuif.min = 0; schuif.max = 1000; schuif.value = 0; schuif.step = 1;
+      schuif.setAttribute('aria-label', 'Positie');
+      var tijden = document.createElement('span'); tijden.className = 'nummer-tijd'; tijden.textContent = '0:00 / –:––';
+      balk.append(schuif, tijden);
+      li.querySelector('.nummer-tekst').appendChild(balk);
+      function bij() {
+        var d = audio.duration;
+        schuif.value = isFinite(d) && d > 0 ? Math.round(audio.currentTime / d * 1000) : 0;
+        schuif.style.setProperty('--p', (schuif.value / 10) + '%');
+        tijden.textContent = tijd(audio.currentTime) + ' / ' + tijd(d);
+      }
+      audio.addEventListener('loadedmetadata', bij);
+      audio.addEventListener('timeupdate', bij);
+      audio.addEventListener('play', function () {
+        alleSpelers.forEach(function (a) { if (a !== audio) a.pause(); });
+        li.classList.add('speelt'); knop.setAttribute('aria-label', 'Pauzeren');
+      });
+      audio.addEventListener('pause', function () { li.classList.remove('speelt'); knop.setAttribute('aria-label', 'Afspelen'); });
+      audio.addEventListener('ended', function () {
+        li.classList.remove('speelt');
+        var volgende = rijen[i + 1] && rijen[i + 1].querySelector('audio');
+        if (volgende) volgende.play();
+      });
+      knop.addEventListener('click', function () { if (audio.paused) audio.play(); else audio.pause(); });
+      schuif.addEventListener('input', function () {
+        if (isFinite(audio.duration)) audio.currentTime = schuif.value / 1000 * audio.duration;
+        schuif.style.setProperty('--p', (schuif.value / 10) + '%');
+      });
+      bij();
     });
   });
 })();
