@@ -287,19 +287,19 @@
     var li = sleep.li;
     // bij de rand van het venster meeschuiven, voor lange lijsten
     if (e.clientY < 60) window.scrollBy(0, -12); else if (e.clientY > window.innerHeight - 60) window.scrollBy(0, 12);
-    // welke lijst en welke plek: de rij onder de muis
+    // welke lijst en welke plek: de lijst die het dichtst bij de muis is (ook als je tussen de twee lijsten loslaat)
     var doel = null, voor = true;
-    [menu, los].forEach(function (lijst) {
-      var vak = lijst.getBoundingClientRect();
-      if (e.clientY < vak.top - 30 || e.clientY > vak.bottom + 30) return;
-      var kandidaten = rijen(lijst).filter(function (r) { return r !== li && sleep.mee.indexOf(r) < 0; });
-      if (!kandidaten.length) { doel = { lijst: lijst, rij: null }; return; }
-      for (var i = 0; i < kandidaten.length; i++) {
+    var afstand = function (lijst) { var v = lijst.getBoundingClientRect(); return e.clientY < v.top ? v.top - e.clientY : e.clientY > v.bottom ? e.clientY - v.bottom : 0; };
+    var lijst = afstand(menu) <= afstand(los) ? menu : los;
+    var kandidaten = rijen(lijst).filter(function (r) { return r !== li && sleep.mee.indexOf(r) < 0; });
+    if (!kandidaten.length) doel = { lijst: lijst, rij: null };
+    else {
+      for (var i = 0; i < kandidaten.length && !doel; i++) {
         var b = kandidaten[i].getBoundingClientRect();
-        if (e.clientY < b.top + b.height / 2) { doel = { lijst: lijst, rij: kandidaten[i] }; voor = true; return; }
+        if (e.clientY < b.top + b.height / 2) doel = { lijst: lijst, rij: kandidaten[i] };
       }
-      doel = { lijst: lijst, rij: kandidaten[kandidaten.length - 1] }; voor = false;
-    });
+      if (!doel) { doel = { lijst: lijst, rij: kandidaten[kandidaten.length - 1] }; voor = false; }
+    }
     if (doel) {
       if (!doel.rij) doel.lijst.appendChild(li);
       else if (voor) doel.lijst.insertBefore(li, doel.rij);
