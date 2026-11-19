@@ -214,7 +214,12 @@ function opmaak(string $tekst): string {
             $bron = $m[3] ?? '';
             $id = $bron !== '' ? youtubeId($bron) : null;
             $plaatje = $id ? 'https://i.ytimg.com/vi/' . $id . '/hqdefault.jpg' : ($bron !== '' ? veiligAdres($bron) : null);
-            if ($doel !== null) {
+            if ($doel !== null && $id) {
+                // video: de speler staat in de tegel zelf, de titel gaat naar de pagina
+                $tegels[] = '<div class="tegel isvideo"><div class="video"><a class="speel" href="https://www.youtube.com/watch?v=' . h($id) . '" data-yt="' . h($id) . '" target="_blank" rel="noopener">'
+                    . '<img src="' . h($plaatje) . '" alt="" loading="lazy"><span class="knopje">▶</span></a></div>'
+                    . '<a class="naam" href="' . h($doel) . '">' . h($m[1]) . '</a></div>';
+            } elseif ($doel !== null) {
                 $tegels[] = '<a class="tegel' . ($id ? ' isvideo' : '') . '" href="' . h($doel) . '">'
                     . ($plaatje ? '<span class="beeld"><img src="' . h($plaatje) . '" alt="" loading="lazy"></span>' : '')
                     . '<span class="naam">' . h($m[1]) . '</span></a>';
@@ -633,8 +638,10 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
     echo '<link rel="stylesheet" href="' . h(url('stijl.css')) . '?v=' . @filemtime(__DIR__ . '/stijl.css') . '"></head><body>';
     $banner = (string)($cfg['kop_afbeelding'] ?? '');
     $banner = $banner !== '' ? veiligAdres($banner) : null;
-    if ($banner) echo '<div class="banner"><a href="' . h(url()) . '"><img src="' . h($banner) . '" alt="' . h($cfg['naam']) . '"></a></div>';
-    echo '<header class="kop"><div class="binnen"><a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
+    // Met een kopfoto staat de naam van het koor over de foto heen; anders links in de menubalk
+    $logo = '<a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
+    if ($banner) echo '<div class="banner"><img src="' . h($banner) . '" alt="">' . $logo . '</div>';
+    echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '' : $logo);
     if ($menuTonen) {
         echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
         foreach ($paginas as $slug => $p) {
