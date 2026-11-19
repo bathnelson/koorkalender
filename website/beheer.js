@@ -267,11 +267,19 @@
   }
 
   var sleep = null; // { li, mee: [submenu-items die meeverhuizen], startX, startDiepte }
+  var wacht = null; // muis ingedrukt op een regel: pas na een paar pixels bewegen gaat het slepen in (anders is het een klik)
+  var netGesleept = false;
   function begin(e) {
+    // met de muis pak je de hele regel, op een touchscherm alleen het handvat ⠿
+    var li = e.target.closest('.menulijst li');
+    if (!li || e.button > 0) return;
     var greep = e.target.closest('.greep');
-    if (!greep || e.button > 0) return;
-    var li = greep.closest('li');
+    if (greep) { start(li, greep, e); return; }
+    if (e.pointerType === 'mouse' && !e.target.closest('button, input, select')) wacht = { li: li, x: e.clientX, y: e.clientY };
+  }
+  function start(li, greep, e) {
     e.preventDefault();
+    wacht = null;
     var mee = [];
     if (li.parentNode === menu && diepte(li) === 0) {
       for (var n = li.nextElementSibling; n && diepte(n) === 1; n = n.nextElementSibling) mee.push(n);
@@ -283,23 +291,41 @@
     greep.setPointerCapture && greep.setPointerCapture(e.pointerId);
   }
   function beweeg(e) {
+    if (wacht && Math.abs(e.clientX - wacht.x) + Math.abs(e.clientY - wacht.y) > 6) {
+      var w = wacht;
+      start(w.li, w.li, e);
+      sleep.startX = w.x;
+      netGesleept = true;
+    }
     if (!sleep) return;
     var li = sleep.li;
     // bij de rand van het venster meeschuiven, voor lange lijsten
     if (e.clientY < 60) window.scrollBy(0, -12); else if (e.clientY > window.innerHeight - 60) window.scrollBy(0, 12);
-    // welke lijst en welke plek: de rij onder de muis
+    // welke lijst en welke plek: de lijst die het dichtst bij de muis is (ook als je tussen de twee lijsten loslaat)
     var doel = null, voor = true;
-    [menu, los].forEach(function (lijst) {
-      var vak = lijst.getBoundingClientRect();
-      if (e.clientY < vak.top - 30 || e.clientY > vak.bottom + 30) return;
-      var kandidaten = rijen(lijst).filter(function (r) { return r !== li && sleep.mee.indexOf(r) < 0; });
-      if (!kandidaten.length) { doel = { lijst: lijst, rij: null }; return; }
-      for (var i = 0; i < kandidaten.length; i++) {
+    var afstand = function (lijst) { var v = lijst.getBoundingClientRect(); return e.clientY < v.top ? v.top - e.clientY : e.clientY > v.bottom ? e.clientY - v.bottom : 0; };
+    var lijst = afstand(menu) <= afstand(los) ? menu : los;
+    var kandidaten = rijen(lijst).filter(function (r) { return r !== li && sleep.mee.indexOf(r) < 0; });
+    // Op het midden van een hoofditem loslaten = in zijn submenu zetten
+    var erin = null;
+    if (lijst === menu && li.dataset.slug !== 'home' && !sleep.mee.length) {
+      kandidaten.forEach(function (k) {
+        if (diepte(k) !== 0) return;
+        var b = k.getBoundingClientRect();
+        if (e.clientY > b.top + b.height * 0.25 && e.clientY < b.bottom - b.height * 0.25) erin = k;
+      });
+    }
+    if (sleep.erin && sleep.erin !== erin) sleep.erin.classList.remove('doel-erin');
+    sleep.erin = erin;
+    if (erin) { erin.classList.add('doel-erin'); return; }
+    if (!kandidaten.length) doel = { lijst: lijst, rij: null };
+    else {
+      for (var i = 0; i < kandidaten.length && !doel; i++) {
         var b = kandidaten[i].getBoundingClientRect();
-        if (e.clientY < b.top + b.height / 2) { doel = { lijst: lijst, rij: kandidaten[i] }; voor = true; return; }
+        if (e.clientY < b.top + b.height / 2) doel = { lijst: lijst, rij: kandidaten[i] };
       }
-      doel = { lijst: lijst, rij: kandidaten[kandidaten.length - 1] }; voor = false;
-    });
+      if (!doel) { doel = { lijst: lijst, rij: kandidaten[kandidaten.length - 1] }; voor = false; }
+    }
     if (doel) {
       if (!doel.rij) doel.lijst.appendChild(li);
       else if (voor) doel.lijst.insertBefore(li, doel.rij);
@@ -320,13 +346,29 @@
       while (volgende && sleep.mee.indexOf(volgende) >= 0) volgende = volgende.nextElementSibling;
       if (d === 0 && volgende && diepte(volgende) === 1 && !sleep.mee.length) d = 1;
       zetDiepte(li, d);
+      // een hoofditem dat hoofditem blijft, mag een ander zijn submenu-items niet afpakken: schuif door tot na dat submenu
+      if (d === 0) {
+        var laatste = null;
+        for (var v = li.nextElementSibling; v && (sleep.mee.indexOf(v) >= 0 || diepte(v) === 1); v = v.nextElementSibling) if (sleep.mee.indexOf(v) < 0) laatste = v;
+        if (laatste) menu.insertBefore(li, laatste.nextSibling);
+      }
     } else zetDiepte(li, 0);
     // submenu-items verhuizen mee, direct achter hun hoofditem
     var plek = li;
     sleep.mee.forEach(function (m) { if (li.parentNode === menu) { menu.insertBefore(m, plek.nextSibling); zetDiepte(m, 1); } else { los.insertBefore(m, plek.nextSibling); zetDiepte(m, 0); } plek = m; });
   }
   function einde() {
+    wacht = null;
+    if (netGesleept) setTimeout(function () { netGesleept = false; }, 0);
     if (!sleep) return;
+    if (sleep.erin) {
+      // achteraan in het submenu van het gekozen hoofditem
+      var na = sleep.erin;
+      while (na.nextElementSibling && diepte(na.nextElementSibling) === 1 && na.nextElementSibling !== sleep.li) na = na.nextElementSibling;
+      menu.insertBefore(sleep.li, na.nextSibling);
+      zetDiepte(sleep.li, 1);
+      sleep.erin.classList.remove('doel-erin');
+    }
     sleep.li.classList.remove('sleept');
     sleep.mee.forEach(function (m) { m.classList.remove('meeverhuis'); });
     document.body.classList.remove('bezig-slepen');
@@ -334,6 +376,9 @@
     bewaar();
   }
   document.addEventListener('pointerdown', begin);
+  // na het slepen geen klik op de link, en de browser moet links in de lijst niet zelf gaan slepen
+  document.addEventListener('click', function (e) { if (netGesleept) { netGesleept = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener('dragstart', function (e) { if (e.target.closest && e.target.closest('.menulijst')) e.preventDefault(); });
   document.addEventListener('pointermove', beweeg);
   document.addEventListener('pointerup', einde);
   document.addEventListener('pointercancel', einde);
