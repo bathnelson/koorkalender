@@ -56,12 +56,41 @@ main.binnen { padding-top: 32px; padding-bottom: 48px; min-height: 60vh; }
 .tekst p, .tekst ul, .tekst ol { max-width: 68ch; }
 .foto { margin: 24px 0; }
 .foto img { border-radius: 10px; max-height: 70vh; width: auto; }
-.galerij { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; margin: 24px 0; }
-.galerij img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+/* fotogalerij als masonry: kolommen waarin elke foto zijn eigen verhouding houdt */
+.galerij { column-width: 220px; column-gap: 8px; margin: 24px 0; }
+.galerij figure { break-inside: avoid; margin: 0 0 8px; }
+.galerij img { width: 100%; height: auto; border-radius: 6px; transition: opacity .2s; }
+.galerij a:hover img { opacity: .85; }
 figure { margin: 0; }
 figcaption { font-size: .85rem; color: var(--stil); padding-top: 4px; }
-.video { position: relative; aspect-ratio: 16 / 9; margin: 24px 0; max-width: 800px; }
-.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 10px; }
+.video { position: relative; aspect-ratio: 16 / 9; margin: 24px 0; max-width: 800px; background: #000; border-radius: 10px; overflow: hidden; }
+.video iframe, .video .speel { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video .speel img { width: 100%; height: 100%; object-fit: cover; opacity: .9; }
+.knopje { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 72px; height: 50px; border-radius: 12px; background: rgba(200, 30, 30, .92); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; transition: background .2s; }
+.speel:hover .knopje { background: #e00; }
+
+/* tegels (bijv. de video-overzichtspagina) */
+.tegels { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin: 24px 0; }
+.tegel { display: block; text-decoration: none; color: var(--tekst); background: var(--kaart); border: 1px solid var(--lijn); border-radius: 10px; overflow: hidden; transition: transform .15s, box-shadow .15s; }
+.tegel:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.tegel .beeld { position: relative; display: block; aspect-ratio: 16 / 9; background: #000; }
+.tegel .beeld img { width: 100%; height: 100%; object-fit: cover; }
+.tegel.isvideo .beeld::after { content: '▶'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 52px; height: 36px; border-radius: 9px; background: rgba(200, 30, 30, .92); color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.tegel .naam { display: block; padding: 10px 14px; font-weight: 600; }
+
+/* lichtbak voor foto's */
+.lichtbak { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.9); display: flex; align-items: center; justify-content: center; }
+.lichtbak figure { margin: 0; max-width: 92vw; max-height: 90vh; text-align: center; }
+.lichtbak img { max-width: 92vw; max-height: 84vh; width: auto; margin: 0 auto; border-radius: 4px; }
+.lichtbak figcaption { color: #ddd; padding-top: 8px; }
+.lichtbak button { position: absolute; background: rgba(255,255,255,.12); color: #fff; border: 0; border-radius: 50%; width: 48px; height: 48px; padding: 0; font-size: 30px; line-height: 1; cursor: pointer; }
+.lb-sluit { top: 16px; right: 16px; }
+.lb-vorige { left: 12px; top: 50%; transform: translateY(-50%); }
+.lb-volgende { right: 12px; top: 50%; transform: translateY(-50%); }
+
+/* brede foto bovenaan */
+.banner { background: var(--kaart); }
+.banner img { width: 100%; max-height: 180px; object-fit: cover; }
 
 .knop, button { display: inline-block; background: var(--kleur); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
 @media (prefers-color-scheme: dark) { .knop, button { color: #111; } }
@@ -70,11 +99,17 @@ button.klein { padding: 4px 10px; font-size: .85rem; font-weight: 400; }
 
 /* concerten */
 .agenda { margin-top: 40px; }
-.concerten { list-style: none; padding: 0; display: grid; gap: 12px; }
-.concerten li { background: var(--kaart); border: 1px solid var(--lijn); border-left: 4px solid var(--accent); border-radius: 10px; padding: 14px 18px; }
-.concerten .wanneer { color: var(--accent); font-weight: 600; font-size: .95rem; }
-.concerten .wat { font-size: 1.15rem; font-weight: 600; }
-.concerten .waar { color: var(--stil); }
+.concerten { display: grid; gap: 16px; margin: 16px 0; }
+.concert { display: flex; gap: 0; background: var(--kaart); border: 1px solid var(--lijn); border-left: 4px solid var(--accent); border-radius: 10px; overflow: hidden; }
+.concertfoto { flex: 0 0 240px; }
+.concertfoto img { width: 100%; height: 100%; object-fit: cover; min-height: 160px; }
+.concerttekst { padding: 14px 18px; flex: 1; min-width: 0; }
+.concert .wanneer { color: var(--accent); font-weight: 600; font-size: .95rem; }
+.concert .wat { font-size: 1.2rem; margin: 2px 0 4px; }
+.concert .waar { color: var(--stil); }
+.concert .beschrijving p { margin: 8px 0; }
+.concert .knop { padding: 8px 16px; }
+@media (max-width: 600px) { .concert { flex-direction: column; } .concertfoto { flex-basis: auto; } .concertfoto img { max-height: 220px; } }
 .stil { color: var(--stil); }
 
 /* formulieren */

@@ -57,9 +57,19 @@ Let op: sluit een lid de browser zonder uit te loggen, dan blijft het app-wachtw
 ![onderschrift](fotos/naam.jpg)
 youtube: https://www.youtube.com/watch?v=...
 knop: [Kaartjes kopen](https://...)
+tegel: [Titel](https://www.youtube.com/watch?v=...)
+tegel: [Titel](pagina) fotos/naam.jpg
 ```
 
-Foto-regels direct onder elkaar worden een fotogalerij. HTML in de tekst werkt bewust niet.
+Foto-regels direct onder elkaar worden een fotogalerij in metselwerk-stijl (masonry); een klik opent de foto groot, met pijltjes naar de volgende. Een video laat eerst alleen de miniatuur zien en laadt de speler pas na een klik. Tegel-regels onder elkaar worden een raster van tegels met plaatje en titel. HTML in de tekst werkt bewust niet.
+
+## Kopfoto
+
+In `config.php` zet je bij `kop_afbeelding` een webadres of `fotos/naam.jpg` (upload via Beheer > Foto's). Die foto staat breed bovenaan elke pagina.
+
+## Concertagenda
+
+Optredens komen uit de jaarkalender (soort 'Optreden'). Onder Beheer > Concerten vul je per optreden aan: hoe laat, waar, beschrijving, foto, link naar de locatie en link naar de kaartverkoop. Een optreden kun je daar ook verbergen. Concerten die niet in de kalender staan voeg je daar zelf toe. Alles wordt bewaard in `inhoud/concerten.json`.
 
 ## Lokaal uitproberen
 

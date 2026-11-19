@@ -112,6 +112,32 @@ if ($actie !== '') {
         terug($hier . '?fotos=1', (string)$fout, true);
     }
 
+    if ($actie === 'concert_opslaan' || $actie === 'concert_weg') {
+        $info = laadConcertInfo();
+        $bron = (string)($_POST['bron'] ?? '');
+        $sleutel = (string)($_POST['sleutel'] ?? '');
+        $w = [];
+        foreach (CONCERT_VELDEN as $v) $w[$v] = trim(mb_substr(str_replace("\r\n", "\n", (string)($_POST[$v] ?? '')), 0, $v === 'beschrijving' ? 5000 : 300));
+        $terugNaar = $hier . '?concerten=1';
+        if ($bron === 'kalender' && isset(kalenderOptredens($CONFIG)[$sleutel])) {
+            if ($actie === 'concert_weg') { unset($info['extra'][$sleutel]); bewaarConcertInfo($info); terug($terugNaar, 'De aanvullingen zijn weggehaald.'); }
+            $w['datum'] = ''; // datum komt altijd uit de kalender
+            $w['verborgen'] = !empty($_POST['verborgen']);
+            $info['extra'][$sleutel] = array_filter($w, function ($x) { return $x !== '' && $x !== false; });
+            bewaarConcertInfo($info);
+            terug($terugNaar, 'Concert opgeslagen.');
+        }
+        if ($bron === 'eigen') {
+            if ($actie === 'concert_weg') { unset($info['eigen'][$sleutel]); bewaarConcertInfo($info); terug($terugNaar, 'Concert verwijderd.'); }
+            if ($w['titel'] === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $w['datum'])) terug($hier . '?concert=' . rawurlencode($sleutel ?: 'nieuw') . '&bron=eigen', 'Vul minstens een titel en datum in.', true);
+            if ($sleutel === '' || !isset($info['eigen'][$sleutel])) $sleutel = 'e' . date('ymdHis') . bin2hex(random_bytes(2));
+            $info['eigen'][$sleutel] = $w;
+            bewaarConcertInfo($info);
+            terug($terugNaar, 'Concert "' . $w['titel'] . '" opgeslagen.');
+        }
+        terug($terugNaar);
+    }
+
     if ($actie === 'foto_weg') {
         $naam = basename((string)($_POST['naam'] ?? ''));
         if (in_array($naam, fotoLijst(), true)) { @unlink(FOTO_DIR . '/' . $naam); terug($hier . '?fotos=1', 'Foto "' . $naam . '" is verwijderd.'); }
@@ -127,14 +153,64 @@ $csrf = '<input type="hidden" name="csrf" value="' . h(csrfToken()) . '">';
 
 kop($CONFIG, 'Beheer', '', false);
 echo '<div class="ledenkop"><h1>Beheer</h1><form method="post">' . $csrf . '<button name="actie" value="uitloggen" class="licht">Uitloggen</button></form></div>';
-echo '<nav class="tabs"><a href="' . h($hier) . '"' . (!isset($_GET['fotos']) ? ' class="actief"' : '') . '>Pagina\'s</a><a href="' . h($hier . '?fotos=1') . '"' . (isset($_GET['fotos']) ? ' class="actief"' : '') . '>Foto\'s</a><a href="' . h(url()) . '" target="_blank">Website bekijken ↗</a></nav>';
+$tabConcert = isset($_GET['concerten']) || isset($_GET['concert']);
+echo '<nav class="tabs"><a href="' . h($hier) . '"' . (!isset($_GET['fotos']) && !$tabConcert ? ' class="actief"' : '') . '>Pagina\'s</a><a href="' . h($hier . '?concerten=1') . '"' . ($tabConcert ? ' class="actief"' : '') . '>Concerten</a><a href="' . h($hier . '?fotos=1') . '"' . (isset($_GET['fotos']) ? ' class="actief"' : '') . '>Foto\'s</a><a href="' . h(url()) . '" target="_blank">Website bekijken ↗</a></nav>';
 if ($bericht) echo '<p class="goed">' . h($bericht) . '</p>';
 if ($melding) echo '<p class="fout">' . h($melding) . '</p>';
 
 $bewerk = $formulier['oud'] ?? (string)($_GET['bewerk'] ?? '');
 $nieuw = isset($_GET['nieuw']) || ($formulier !== null && $formulier['oud'] === '');
 
-if (isset($_GET['fotos'])) {
+if ($tabConcert && isset($_GET['concert'])) {
+    $bron = ($_GET['bron'] ?? '') === 'kalender' ? 'kalender' : 'eigen';
+    $sleutel = (string)$_GET['concert'];
+    $info = laadConcertInfo();
+    $kal = $bron === 'kalender' ? (kalenderOptredens($CONFIG)[$sleutel] ?? null) : null;
+    if ($bron === 'kalender' && !$kal) { echo '<p class="fout">Dit optreden staat niet (meer) in de jaarkalender.</p>'; voet($CONFIG); exit; }
+    $w = $bron === 'kalender' ? ($info['extra'][$sleutel] ?? []) : ($info['eigen'][$sleutel] ?? []);
+    $v = function ($k) use ($w) { return h((string)($w[$k] ?? '')); };
+    $ph = function ($k) use ($kal) { return $kal && ($kal[$k] ?? '') !== '' ? ' placeholder="' . h($kal[$k]) . '"' : ''; };
+    echo '<form method="post" class="kaart bewerk">' . $csrf . '<input type="hidden" name="bron" value="' . h($bron) . '"><input type="hidden" name="sleutel" value="' . h($sleutel === 'nieuw' ? '' : $sleutel) . '">';
+    if ($kal) {
+        echo '<h2>' . h($kal['titel'] ?? '') . '</h2><p class="stil">Uit de jaarkalender: ' . h(datumNL($kal['datum'])) . (($kal['tijd'] ?? '') !== '' ? ', ' . h($kal['tijd']) : '') . (($kal['waar'] ?? '') !== '' ? ', ' . h($kal['waar']) : '')
+            . '. De datum pas je aan in de jaarkalender. Laat een veld hieronder leeg om de tekst uit de kalender te gebruiken.</p>';
+    } else {
+        echo '<h2>' . ($w ? 'Concert bewerken' : 'Nieuw concert') . '</h2><p class="stil">Voor een concert dat niet in de jaarkalender staat.</p>';
+        echo '<div class="rij"><label class="smal">Datum<input type="date" name="datum" value="' . $v('datum') . '" required></label></div>';
+    }
+    echo '<label>Titel<input name="titel" value="' . $v('titel') . '"' . $ph('titel') . ($kal ? '' : ' required') . '></label>';
+    echo '<div class="rij"><label class="smal">Hoe laat<input name="tijd" value="' . $v('tijd') . '"' . $ph('tijd') . ' placeholder="bijv. 15:00-16:30"></label>';
+    echo '<label style="flex:1">Waar<input name="waar" value="' . $v('waar') . '"' . $ph('waar') . '></label></div>';
+    echo '<label>Beschrijving<textarea name="beschrijving" rows="6">' . $v('beschrijving') . '</textarea></label>';
+    echo '<label>Foto (kies uit je foto\'s, of plak een webadres)<input name="foto" value="' . $v('foto') . '" list="fotolijst" placeholder="fotos/naam.jpg"></label><datalist id="fotolijst">';
+    foreach (fotoLijst() as $f) echo '<option value="fotos/' . h($f) . '">';
+    echo '</datalist>';
+    echo '<label>Link naar de locatie (bijv. Google Maps of de website van de zaal)<input type="url" name="locatie_url" value="' . $v('locatie_url') . '" placeholder="https://"></label>';
+    echo '<label>Link naar de kaartverkoop<input type="url" name="kaarten_url" value="' . $v('kaarten_url') . '" placeholder="https://"></label>';
+    if ($kal) echo '<label class="vink"><input type="checkbox" name="verborgen" value="1"' . (!empty($w['verborgen']) ? ' checked' : '') . '> Niet op de website tonen</label>';
+    echo '<div class="knoppen"><button name="actie" value="concert_opslaan">Opslaan</button><a href="' . h($hier . '?concerten=1') . '">Annuleren</a>';
+    if ($w) echo '<button name="actie" value="concert_weg" class="licht" onclick="return confirm(\'' . ($kal ? 'Aanvullingen weghalen?' : 'Dit concert verwijderen?') . '\')">' . ($kal ? 'Aanvullingen weghalen' : 'Verwijderen') . '</button>';
+    echo '</div></form>';
+} elseif ($tabConcert) {
+    echo '<p><a class="knop" href="' . h($hier . '?concert=nieuw&bron=eigen') . '">+ Concert dat niet in de kalender staat</a></p>';
+    echo '<p class="stil">Optredens uit de jaarkalender staan hier vanzelf. Klik erop om een beschrijving, foto of links toe te voegen.</p>';
+    $vandaag = date('Y-m-d');
+    $lijst = array_filter(alleConcerten($CONFIG, true), function ($c) use ($vandaag) { return ($c['tm'] !== '' ? $c['tm'] : $c['datum']) >= $vandaag; });
+    if (!$lijst) echo '<p class="stil">Er zijn geen komende concerten.</p>';
+    else {
+        echo '<ul class="paginalijst">';
+        foreach ($lijst as $c) {
+            $extra = [];
+            if ($c['bron'] === 'eigen') $extra[] = 'niet in kalender';
+            if ($c['foto'] !== '') $extra[] = 'foto';
+            if ($c['beschrijving'] !== '') $extra[] = 'beschrijving';
+            if ($c['kaarten_url'] !== '') $extra[] = 'kaarten';
+            if ($c['verborgen']) $extra[] = 'verborgen';
+            echo '<li><a href="' . h($hier . '?concert=' . rawurlencode($c['sleutel']) . '&bron=' . $c['bron']) . '"><strong>' . h($c['titel']) . '</strong><small>' . h(datumNL($c['datum'])) . ($c['tijd'] !== '' ? ' · ' . h($c['tijd']) : '') . ($extra ? ' · ' . h(implode(', ', $extra)) : '') . '</small></a></li>';
+        }
+        echo '</ul>';
+    }
+} elseif (isset($_GET['fotos'])) {
     echo '<form method="post" enctype="multipart/form-data" class="kaart">' . $csrf . '<h2>Foto toevoegen</h2><input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/gif,image/webp" required> <button name="actie" value="foto" id="fotoknop">Uploaden</button><p class="stil">Grote foto\'s worden vóór het uploaden automatisch verkleind tot maximaal 1600 pixels breed. Na het uploaden zie je hieronder de regel die je in een pagina plakt. Zet je meerdere foto-regels direct onder elkaar, dan worden ze een fotogalerij.</p></form>';
     echo <<<'JS'
 <script>
@@ -184,8 +260,8 @@ JS;
     echo '<label class="smal">Plek in menu<input type="number" name="volgorde" value="' . (int)$w['volgorde'] . '" min="0" max="999"></label></div>';
     echo '<label>Tekst<textarea name="tekst" rows="18">' . h($w['tekst']) . '</textarea></label>';
     echo '<details class="hulp"><summary>Hoe maak ik een kop, link, foto of video?</summary><pre>'
-        . h("# Grote kop\n## Kleinere kop\n**vetgedrukt**   *schuin*\n- opsomming\n1. genummerde lijst\n[tekst van de link](https://www.voorbeeld.nl)\n[naar een andere pagina](over-ons)\n![onderschrift](fotos/naam.jpg)\nyoutube: https://www.youtube.com/watch?v=...\nknop: [Kaartjes kopen](https://...)")
-        . '</pre><p>Een lege regel begint een nieuwe alinea. Foto-regels direct onder elkaar worden een fotogalerij.</p></details>';
+        . h("# Grote kop\n## Kleinere kop\n**vetgedrukt**   *schuin*\n- opsomming\n1. genummerde lijst\n[tekst van de link](https://www.voorbeeld.nl)\n[naar een andere pagina](over-ons)\n![onderschrift](fotos/naam.jpg)\nyoutube: https://www.youtube.com/watch?v=...\ntegel: [Titel](andere-pagina) https://www.youtube.com/watch?v=...\nknop: [Kaartjes kopen](https://...)")
+        . '</pre><p>Een lege regel begint een nieuwe alinea. Foto-regels direct onder elkaar worden een fotogalerij. Tegel-regels onder elkaar worden een raster met plaatjes; bij een YouTube-adres komt het plaatje van de video erin, je kunt ook fotos/naam.jpg gebruiken.</p></details>';
     echo '<div class="knoppen"><button name="actie" value="opslaan">Opslaan</button><button name="actie" value="voorbeeld" class="licht">Voorbeeld bekijken</button><a href="' . h($hier) . '">Annuleren</a></div></form>';
     if ($voorbeeld !== null) {
         echo '<section class="voorbeeld"><p class="stil">Voorbeeld, nog niet opgeslagen:</p><article class="tekst">' . opmaak($voorbeeld['tekst']) . '</article>';
