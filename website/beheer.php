@@ -5,6 +5,14 @@ declare(strict_types=1);
 if (!isset($CONFIG)) { http_response_code(404); exit; }
 
 const MAX_FOTO = 8 * 1024 * 1024;
+const PAGINA_SOORTEN = ['tekst', 'fotos', 'video', 'overzicht'];
+// Soort pagina raden voor pagina's van vóór de editor
+function raadSoort(string $tekst): string {
+    if (preg_match('/^tegel:/mi', $tekst)) return 'overzicht';
+    if (preg_match('/^youtube:/mi', $tekst)) return 'video';
+    if (preg_match_all('/^\[?!\[/m', $tekst) > 1) return 'fotos';
+    return 'tekst';
+}
 const FOTO_SOORTEN = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_GIF => 'gif', IMAGETYPE_WEBP => 'webp'];
 
 $melding = probeerLogin('beheer', $CONFIG);
@@ -35,6 +43,27 @@ function antwoordJson(array $data): void {
     exit;
 }
 
+function audioLijst(): array {
+    $f = glob(AUDIO_DIR . '/*.{mp3,m4a,aac,ogg,oga,opus,wav}', GLOB_BRACE) ?: [];
+    usort($f, function ($a, $b) { return filemtime($b) <=> filemtime($a); });
+    return array_map('basename', $f);
+}
+const MAX_AUDIO = 40 * 1024 * 1024;
+// Een audiobestand bewaren in inhoud/audio. Geeft de naam, of een string die met 'FOUT:' begint.
+function bewaarAudio(string $tmp, string $oorspronkelijk, bool $upload): string {
+    $ext = strtolower(pathinfo($oorspronkelijk, PATHINFO_EXTENSION));
+    $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->buffer((string)file_get_contents($tmp, false, null, 0, 4096));
+    if (!preg_match(AUDIO_EXT, '.' . $ext) || !preg_match('~^(audio/|video/mp4|video/ogg|application/octet-stream)~', $mime)) return 'FOUT:Dit is geen audiobestand (mp3, m4a, ogg of wav).';
+    if (!is_dir(AUDIO_DIR)) mkdir(AUDIO_DIR, 0775, true);
+    $basis = maakSlug(pathinfo($oorspronkelijk, PATHINFO_FILENAME)) ?: 'audio';
+    $naam = $basis . '.' . $ext;
+    for ($i = 2; is_file(AUDIO_DIR . '/' . $naam); $i++) $naam = $basis . '-' . $i . '.' . $ext;
+    $ok = $upload ? move_uploaded_file($tmp, AUDIO_DIR . '/' . $naam) : (@rename($tmp, AUDIO_DIR . '/' . $naam) || @copy($tmp, AUDIO_DIR . '/' . $naam));
+    if (!$ok) return 'FOUT:Opslaan mislukt: de map inhoud/audio is niet schrijfbaar.';
+    @chmod(AUDIO_DIR . '/' . $naam, 0644);
+    return $naam;
+}
+
 function fotoLijst(): array {
     $f = glob(FOTO_DIR . '/*.{jpg,png,gif,webp}', GLOB_BRACE) ?: [];
     usort($f, function ($a, $b) { return filemtime($b) <=> filemtime($a); });
@@ -61,7 +90,7 @@ if (isset($_GET['ncfotos'])) {
     antwoordJson([
         'map' => $sub,
         'mappen' => array_map(function ($m) { return $m['naam']; }, $lijst['mappen']),
-        'fotos' => array_values(array_map(function ($b) { return $b['naam']; }, array_filter($lijst['bestanden'], function ($b) { return preg_match(FOTO_EXT, $b['naam']); }))),
+        'fotos' => array_values(array_map(function ($b) { return $b['naam']; }, array_filter($lijst['bestanden'], function ($b) { return preg_match(($_GET['soort'] ?? '') === 'audio' ? AUDIO_EXT : FOTO_EXT, $b['naam']); }))),
     ]);
 }
 if (isset($_GET['ncvoorbeeld'])) {
@@ -137,6 +166,7 @@ if ($actie !== '') {
             'onder' => (string)($_POST['onder'] ?? ''),
             'link' => trim(mb_substr((string)($_POST['link'] ?? ''), 0, 500)),
             'concerten' => !empty($_POST['concerten']),
+            'soort' => in_array($_POST['soort'] ?? '', PAGINA_SOORTEN, true) ? (string)$_POST['soort'] : 'tekst',
             'tekst' => mb_substr(str_replace("\r\n", "\n", (string)($_POST['tekst'] ?? '')), 0, 100000),
         ];
         if ($actie === 'voorbeeld') {
@@ -155,7 +185,7 @@ if ($actie !== '') {
             // Submenu: alleen onder een bestaande pagina die zelf geen submenu-item is
             $onder = $formulier['onder'];
             if ($onder === $slug || !isset($paginas[$onder]) || !empty($paginas[$onder]['onder'])) $onder = '';
-            $paginas[$slug] = ['titel' => $titel, 'menu' => $formulier['menu'], 'volgorde' => $formulier['volgorde'], 'onder' => $onder, 'link' => $formulier['link'], 'concerten' => $formulier['concerten'], 'tekst' => $formulier['tekst']];
+            $paginas[$slug] = ['titel' => $titel, 'menu' => $formulier['menu'], 'volgorde' => $formulier['volgorde'], 'onder' => $onder, 'link' => $formulier['link'], 'concerten' => $formulier['concerten'], 'soort' => $formulier['soort'], 'tekst' => $formulier['tekst']];
             // Wordt deze pagina zelf een submenu-item, dan schuiven zijn eigen submenu-items een niveau op
             if ($onder !== '') foreach ($paginas as $k => $p) if (($p['onder'] ?? '') === $slug) $paginas[$k]['onder'] = '';
             bewaarPaginas($paginas);
@@ -200,6 +230,17 @@ if ($actie !== '') {
     // Een foto uit Nextcloud naar de website kopiëren (verkleind), zodat de site niet van Nextcloud afhangt
     if ($actie === 'nc_foto') {
         $pad = ncAan($CONFIG) ? ncFotoPad($CONFIG, (string)($_POST['pad'] ?? '')) : null;
+        if ($pad !== null && preg_match(AUDIO_EXT, $pad)) {
+            session_write_close();
+            $data = ncOphalen($CONFIG, $pad, false, MAX_AUDIO, $st);
+            if ($data === null) antwoordJson(['fout' => 'Het bestand kon niet uit Nextcloud gehaald worden (HTTP ' . $st['http'] . ($st['te_groot'] ? ', groter dan 40 MB' : '') . ').']);
+            $tmp = tempnam(sys_get_temp_dir(), 'wkh');
+            file_put_contents($tmp, $data); unset($data);
+            $naam = bewaarAudio($tmp, basename($pad), false);
+            @unlink($tmp);
+            if (strpos($naam, 'FOUT:') === 0) antwoordJson(['fout' => substr($naam, 5)]);
+            antwoordJson(['naam' => $naam, 'src' => url('inhoud/audio/' . $naam)]);
+        }
         if ($pad === null || !preg_match(FOTO_EXT, $pad)) antwoordJson(['fout' => 'Ongeldige foto.']);
         session_write_close();
         $data = ncOphalen($CONFIG, $pad, false, 40 * 1024 * 1024, $st);
@@ -218,6 +259,17 @@ if ($actie !== '') {
         @unlink($tmp);
         @chmod(FOTO_DIR . '/' . $naam, 0644);
         antwoordJson(['naam' => $naam, 'src' => url('inhoud/fotos/' . $naam)]);
+    }
+
+    if ($actie === 'audio') {
+        $f = $_FILES['audio'] ?? null;
+        $code = is_array($f) && !is_array($f['error'] ?? null) ? (int)($f['error'] ?? UPLOAD_ERR_NO_FILE) : UPLOAD_ERR_NO_FILE;
+        if ($code === UPLOAD_ERR_INI_SIZE || $code === UPLOAD_ERR_FORM_SIZE) antwoordJson(['fout' => 'Dit bestand is te groot voor de server (maximaal ' . ini_get('upload_max_filesize') . '). Zet het in Nextcloud en kies het daar.']);
+        if ($code !== UPLOAD_ERR_OK) antwoordJson(['fout' => 'Kies eerst een audiobestand.']);
+        if ($f['size'] > MAX_AUDIO) antwoordJson(['fout' => 'Dit bestand is te groot (meer dan 40 MB).']);
+        $naam = bewaarAudio($f['tmp_name'], (string)$f['name'], true);
+        if (strpos($naam, 'FOUT:') === 0) antwoordJson(['fout' => substr($naam, 5)]);
+        antwoordJson(['naam' => $naam, 'src' => url('inhoud/audio/' . $naam)]);
     }
 
     if ($actie === 'foto') {
@@ -385,7 +437,7 @@ if ($tabConcert && isset($_GET['concert'])) {
     }
     echo '</div>';
 } elseif ($nieuw || ($bewerk !== '' && isset($paginas[$bewerk]))) {
-    $w = $formulier ?? ($nieuw ? ['oud' => '', 'adres' => '', 'titel' => '', 'menu' => true, 'volgorde' => 50, 'onder' => '', 'link' => '', 'concerten' => false, 'tekst' => "# Titel\n\n"]
+    $w = $formulier ?? ($nieuw ? ['oud' => '', 'adres' => '', 'titel' => '', 'menu' => true, 'volgorde' => 50, 'onder' => '', 'link' => '', 'concerten' => false, 'soort' => 'tekst', 'tekst' => '']
         : ['oud' => $bewerk, 'adres' => $bewerk] + $paginas[$bewerk]);
     $w['onder'] = (string)($w['onder'] ?? '');
     $w['link'] = (string)($w['link'] ?? '');
@@ -404,11 +456,16 @@ if ($tabConcert && isset($_GET['concert'])) {
     }
     echo '</select></label></div>';
     echo '<label>Menu-item verwijst naar een andere website (leeg = deze pagina)<input type="url" name="link" value="' . h($w['link']) . '" placeholder="https://"></label>';
-    echo '<div class="tekstkop"><label for="paginatekst">Tekst</label><button type="button" class="licht klein" data-fotokiezer="paginatekst">📷 Foto invoegen</button></div>';
+    $soort = in_array($w['soort'] ?? '', PAGINA_SOORTEN, true) ? $w['soort'] : ($w['oud'] === '' ? 'tekst' : raadSoort((string)$w['tekst']));
+    echo '<label class="smal">Soort pagina<select name="soort" id="paginasoort">';
+    foreach (['tekst' => 'Tekst met kopjes en foto\'s', 'fotos' => 'Fotogalerij', 'video' => 'Video', 'overzicht' => 'Overzicht met tegels'] as $k => $l) echo '<option value="' . $k . '"' . ($soort === $k ? ' selected' : '') . '>' . h($l) . '</option>';
+    echo '</select></label>';
+    echo '<h3 class="inhoudkop">Inhoud</h3><div id="blokeditor" data-nieuw="' . ($w['oud'] === '' && $formulier === null ? '1' : '0') . '"></div>';
+    echo '<div id="tekshulp"><div class="tekstkop"><label for="paginatekst">Tekst</label><button type="button" class="licht klein" data-fotokiezer="paginatekst">📷 Foto invoegen</button></div>';
     echo '<textarea name="tekst" id="paginatekst" rows="18">' . h($w['tekst']) . '</textarea>';
     echo '<details class="hulp"><summary>Hoe maak ik een kop, link, foto of video?</summary><pre>'
-        . h("# Grote kop\n## Kleinere kop\n**vetgedrukt**   *schuin*\n- opsomming\n1. genummerde lijst\n[tekst van de link](https://www.voorbeeld.nl)\n[naar een andere pagina](over-ons)\n![onderschrift](fotos/naam.jpg)\nyoutube: https://www.youtube.com/watch?v=...\ntegel: [Titel](andere-pagina) https://www.youtube.com/watch?v=...\nknop: [Kaartjes kopen](https://...)")
-        . '</pre><p>Een lege regel begint een nieuwe alinea. Foto-regels direct onder elkaar worden een fotogalerij. Tegel-regels onder elkaar worden een raster met plaatjes; bij een YouTube-adres komt het plaatje van de video erin, je kunt ook fotos/naam.jpg gebruiken.</p></details>';
+        . h("# Grote kop\n## Kleinere kop\n**vetgedrukt**   *schuin*\n- opsomming\n1. genummerde lijst\n[tekst van de link](https://www.voorbeeld.nl)\n[naar een andere pagina](over-ons)\n![onderschrift](fotos/naam.jpg)\n[![onderschrift](fotos/naam.jpg)](andere-pagina)\naudio: [Titel](audio/naam.mp3)\nyoutube: https://www.youtube.com/watch?v=...\ntegel: [Titel](andere-pagina) https://www.youtube.com/watch?v=...\nknop: [Kaartjes kopen](https://...)")
+        . '</pre><p>Een lege regel begint een nieuwe alinea. Foto-regels direct onder elkaar worden een fotogalerij. Tegel-regels onder elkaar worden een raster met plaatjes; bij een YouTube-adres komt het plaatje van de video erin, je kunt ook fotos/naam.jpg gebruiken.</p></details></div>';
     echo '<div class="knoppen"><button name="actie" value="opslaan">Opslaan</button><button name="actie" value="voorbeeld" class="licht">Voorbeeld bekijken</button><a href="' . h($hier) . '">Annuleren</a></div></form>';
     if ($voorbeeld !== null) {
         echo '<section class="voorbeeld"><p class="stil">Voorbeeld, nog niet opgeslagen:</p><article class="tekst">' . opmaak($voorbeeld['tekst']) . '</article>';
@@ -442,7 +499,12 @@ if ($tabConcert && isset($_GET['concert'])) {
     echo '</ul><p class="stil">Er wordt bij elke wijziging automatisch een reservekopie bewaard (map inhoud/backup, de laatste 50).</p>';
 }
 // Gegevens voor de fotokiezer en het verkleinen van foto's (beheer.js)
-$fotoData = ['upload' => $hier . '?ajax=1', 'nc' => ncAan($CONFIG) || ssoAan($CONFIG) ? $hier : null, 'csrf' => csrfToken(), 'fotos' => array_map(function ($n) { return ['naam' => $n, 'src' => url('inhoud/fotos/' . $n)]; }, fotoLijst())];
+$fotoData = ['upload' => $hier . '?ajax=1', 'nc' => ncAan($CONFIG) || ssoAan($CONFIG) ? $hier : null, 'csrf' => csrfToken(),
+    'fotos' => array_map(function ($n) { return ['naam' => $n, 'src' => url('inhoud/fotos/' . $n)]; }, fotoLijst()),
+    'audio' => array_map(function ($n) { return ['naam' => $n, 'src' => url('inhoud/audio/' . $n)]; }, audioLijst()),
+    'fotobasis' => url('inhoud/fotos/'), 'audiobasis' => url('inhoud/audio/'),
+    'paginas' => array_map(function ($k, $p) { return ['slug' => (string)$k, 'titel' => (string)$p['titel']]; }, array_keys($paginas), $paginas)];
 echo '<script type="application/json" id="fotodata">' . json_encode($fotoData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) . '</script>';
 echo '<script src="' . h(url('beheer.js')) . '?v=' . @filemtime(__DIR__ . '/beheer.js') . '" defer></script>';
+echo '<script src="' . h(url('editor.js')) . '?v=' . @filemtime(__DIR__ . '/editor.js') . '" defer></script>';
 voet($CONFIG);

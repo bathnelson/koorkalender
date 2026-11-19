@@ -48,7 +48,7 @@
     toon();
   }
   document.querySelectorAll('.galerij, .foto').forEach(function (g) {
-    var links = Array.prototype.slice.call(g.querySelectorAll('figure > a'));
+    var links = Array.prototype.slice.call(g.querySelectorAll('figure > a:not(.doorlink)'));
     links.forEach(function (a, i) {
       a.addEventListener('click', function (e) { e.preventDefault(); open(links, i); });
     });

@@ -9,6 +9,8 @@ date_default_timezone_set('Europe/Amsterdam');
 const INHOUD_DIR = __DIR__ . '/inhoud';
 const PAGINAS_FILE = INHOUD_DIR . '/paginas.json';
 const FOTO_DIR = INHOUD_DIR . '/fotos';
+const AUDIO_DIR = INHOUD_DIR . '/audio';
+const AUDIO_EXT = '/\.(mp3|m4a|aac|ogg|oga|opus|wav)$/i';
 const BACKUP_DIR = INHOUD_DIR . '/backup';
 const MAX_BACKUPS = 50;
 const INSTELLINGEN_FILE = INHOUD_DIR . '/instellingen.json';
@@ -164,6 +166,8 @@ function standaardPaginas(): array {
 //   # Kop, ## Kleinere kop     **vet**   *schuin*   [tekst](https://link)
 //   - opsomming                1. genummerd
 //   ![onderschrift](fotos/naam.jpg)   losse foto's onder elkaar worden een fotogalerij
+//   [![onderschrift](fotos/naam.jpg)](pagina-of-link)   foto die ergens naartoe linkt (anders: groot bekijken bij klikken)
+//   audio: [Titel](audio/naam.mp3)                 een geluidsspeler
 //   youtube: https://www.youtube.com/watch?v=...   wordt een video (speler laadt pas na een klik)
 //   tegel: [Titel](pagina) https://youtube.../fotos/x.jpg   tegels onder elkaar worden een raster met plaatjes
 //   knop: [Kaartjes](https://...)                  wordt een knop
@@ -174,7 +178,7 @@ function veiligAdres(string $u): ?string {
     $u = trim($u);
     if (preg_match('~^(https?://|mailto:|tel:)~i', $u)) return $u;
     if (preg_match('~^(/|#)~', $u) && strpos($u, '//') !== 0) return $u;
-    if (preg_match('~^fotos/[A-Za-z0-9._-]+$~', $u)) return url('inhoud/' . $u);
+    if (preg_match('~^(fotos|audio)/[A-Za-z0-9._-]+$~', $u)) return url('inhoud/' . $u);
     if (preg_match('~^[a-z0-9-]+$~', $u)) return paginaUrl($u);
     return null;
 }
@@ -246,16 +250,20 @@ function opmaak(string $tekst): string {
         }
         $sluitTegels();
 
-        // foto: ![onderschrift](fotos/naam.jpg)
-        if (preg_match('/^!\[([^\]]*)\]\(([^)\s]+)\)$/', $t, $m)) {
+        // foto: ![onderschrift](fotos/naam.jpg), of met een link eromheen: [![onderschrift](fotos/naam.jpg)](pagina)
+        if (preg_match('/^!\[([^\]]*)\]\(([^)\s]+)\)$/', $t, $m) || preg_match('/^\[!\[([^\]]*)\]\(([^)\s]+)\)\]\(([^)\s]+)\)$/', $t, $m)) {
             $sluitTekst();
             $adres = veiligAdres($m[2]);
+            $doel = isset($m[3]) ? veiligAdres($m[3]) : null;
             if ($adres !== null) {
                 $onder = $m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '';
                 // Bij eigen foto's de verhouding meegeven, zodat de galerij meteen goed staat
                 $maat = preg_match('~^fotos/([A-Za-z0-9._-]+)$~', $m[2], $f) ? @getimagesize(FOTO_DIR . '/' . $f[1]) : false;
                 $r = $maat && $maat[1] > 0 ? round($maat[0] / $maat[1], 3) : null;
-                $galerij[] = '<figure' . ($r ? ' style="--r:' . $r . '"' : '') . '><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '"'
+                $a = $doel !== null
+                    ? '<a class="doorlink" href="' . h($doel) . '"' . (preg_match('~^https?://~i', $doel) ? ' target="_blank" rel="noopener"' : '') . '>'
+                    : '<a href="' . h($adres) . '">';
+                $galerij[] = '<figure' . ($r ? ' style="--r:' . $r . '"' : '') . '>' . $a . '<img src="' . h($adres) . '" alt="' . h($m[1]) . '"'
                     . ($maat ? ' width="' . (int)$maat[0] . '" height="' . (int)$maat[1] . '"' : '') . ' loading="lazy"></a>' . $onder . '</figure>';
             }
             continue;
@@ -266,6 +274,12 @@ function opmaak(string $tekst): string {
             $sluitTekst();
             $id = youtubeId($m[1]);
             if ($id) $uit[] = '<div class="video"><a class="speel" href="https://www.youtube.com/watch?v=' . h($id) . '" data-yt="' . h($id) . '" target="_blank" rel="noopener" aria-label="Video afspelen"><img src="https://i.ytimg.com/vi/' . h($id) . '/hqdefault.jpg" alt="" loading="lazy"><span class="knopje">▶</span></a></div>';
+            continue;
+        }
+        if (preg_match('/^audio:\s*\[([^\]]*)\]\(([^)\s]+)\)$/i', $t, $m)) {
+            $sluitTekst();
+            $adres = veiligAdres($m[2]);
+            if ($adres !== null && !preg_match('~^(mailto|tel):~i', $adres)) $uit[] = '<figure class="audio">' . ($m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '') . '<audio controls preload="none" src="' . h($adres) . '"></audio></figure>';
             continue;
         }
         if (preg_match('/^knop:\s*\[([^\]]+)\]\(([^)\s]+)\)$/i', $t, $m)) {
