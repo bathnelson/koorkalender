@@ -56,7 +56,13 @@ img { max-width: 100%; height: auto; display: block; }
 }
 
 main.binnen { padding-top: 32px; padding-bottom: 48px; min-height: 60vh; }
-.voet { border-top: 1px solid var(--lijn); color: var(--stil); font-size: .9rem; padding: 20px 0; }
+.voet { border-top: 1px solid var(--lijn); color: var(--stil); font-size: .9rem; padding: 24px 0; margin-top: 32px; }
+.voet .binnen { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.voet p { margin: 0; }
+.gevers p { margin-bottom: 8px; }
+.gevers .logos { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.gevers a, .gevers .logos > span { display: inline-flex; align-items: center; color: var(--tekst); font-weight: 600; text-decoration: none; }
+.gevers img { height: 56px; width: auto; max-width: 220px; object-fit: contain; background: #fff; padding: 6px 10px; border-radius: 6px; }
 
 /* tekst van een pagina */
 .tekst h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 16px; }

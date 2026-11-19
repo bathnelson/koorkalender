@@ -71,6 +71,10 @@ In het beheer staat bij een pagina de knop **Foto invoegen** en bij een concert 
 
 In `config.php` zet je bij `kop_afbeelding` een webadres of `fotos/naam.jpg` (upload via Beheer > Foto's). Die foto staat breed bovenaan elke pagina.
 
+## Subsidiegevers in de voettekst
+
+Onderaan elke pagina staat "Mede mogelijk gemaakt door" met de logo's uit `subsidiegevers` in `config.php`. Upload het logo via Beheer > Foto's (bijv. als `logo-gemeente-haarlem.png`) en zet die naam bij `logo`. Zolang het logo er niet is, staat de naam er als tekst. Meer gevers of sponsors voeg je toe als extra regel.
+
 ## Concertagenda
 
 Optredens komen uit de jaarkalender (soort 'Optreden'). Onder Beheer > Concerten vul je per optreden aan: hoe laat, waar, beschrijving, foto, link naar de locatie en link naar de kaartverkoop. Een optreden kun je daar ook verbergen. Concerten die niet in de kalender staan voeg je daar zelf toe. Alles wordt bewaard in `inhoud/concerten.json`.

@@ -20,6 +20,13 @@ return [
     // Gebruik je "Inloggen met Nextcloud" (zie hieronder), dan kun je dit op 'verander-mij' laten staan.
     'leden_wachtwoord' => 'verander-mij',
 
+    // ---- Voettekst: subsidiegevers en sponsors, onderaan elke pagina ----
+    'subsidie_tekst' => 'Mede mogelijk gemaakt door',
+    // Per gever: naam, logo (upload via Beheer > Foto's en zet hier fotos/naam.png) en link. Zolang het logo er niet is, staat de naam er.
+    'subsidiegevers' => [
+        ['naam' => 'Gemeente Haarlem', 'logo' => 'fotos/logo-gemeente-haarlem.png', 'link' => 'https://www.haarlem.nl'],
+    ],
+
     // ---- Jaarkalender (de koorkalender op dezelfde host) ----
 
     // Pad naar planning.json van de koorkalender. Standaard staat de kalender in de submap kalender/ van de website.

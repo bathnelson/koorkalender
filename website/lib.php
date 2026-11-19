@@ -727,6 +727,19 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
 }
 
 function voet(array $cfg): void {
-    echo '</main><footer class="voet"><div class="binnen">© ' . date('Y') . ' ' . h($cfg['naam']) . '</div></footer>';
+    // Subsidiegevers en sponsors met logo, in te stellen in config.php
+    $gevers = '';
+    foreach ((array)($cfg['subsidiegevers'] ?? []) as $g) {
+        if (!is_array($g) || trim((string)($g['naam'] ?? '')) === '') continue;
+        $logo = (string)($g['logo'] ?? '');
+        if (preg_match('~^fotos/([A-Za-z0-9._-]+)$~', $logo, $m) && !is_file(FOTO_DIR . '/' . $m[1])) $logo = ''; // logo nog niet geüpload
+        $logo = $logo !== '' ? veiligAdres($logo) : null;
+        $inhoud = $logo ? '<img src="' . h($logo) . '" alt="' . h($g['naam']) . '" loading="lazy">' : '<span>' . h($g['naam']) . '</span>';
+        $link = (string)($g['link'] ?? '') !== '' ? veiligAdres((string)$g['link']) : null;
+        $gevers .= $link ? '<a href="' . h($link) . '" target="_blank" rel="noopener" title="' . h($g['naam']) . '">' . $inhoud . '</a>' : '<span title="' . h($g['naam']) . '">' . $inhoud . '</span>';
+    }
+    echo '</main><footer class="voet"><div class="binnen">';
+    if ($gevers !== '') echo '<div class="gevers"><p>' . h((string)($cfg['subsidie_tekst'] ?? 'Mede mogelijk gemaakt door')) . '</p><div class="logos">' . $gevers . '</div></div>';
+    echo '<p class="rechten">© ' . date('Y') . ' ' . h($cfg['naam']) . '</p></div></footer>';
     echo '<script src="' . h(url('site.js')) . '?v=' . @filemtime(__DIR__ . '/site.js') . '" defer></script></body></html>';
 }
