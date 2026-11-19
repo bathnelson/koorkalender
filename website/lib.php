@@ -681,6 +681,13 @@ function grootte(int $b): string {
 
 // ---------- opbouw van een pagina ----------
 
+// Eén menu-item; met 'link' verwijst het naar een andere website
+function menuLink(string $slug, array $p, bool $actief, bool $pijl = false): string {
+    $extern = (string)($p['link'] ?? '') !== '' ? veiligAdres((string)$p['link']) : null;
+    return '<a href="' . h($extern ?? paginaUrl($slug)) . '"' . ($actief ? ' class="actief"' : '') . ($extern ? ' target="_blank" rel="noopener"' : '') . '>'
+        . h($p['titel']) . ($extern ? ' ↗' : '') . ($pijl ? '<span class="pijl" aria-hidden="true">▾</span>' : '') . '</a>';
+}
+
 function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = true): void {
     $paginas = laadPaginas();
     header('Content-Type: text/html; charset=utf-8');
@@ -697,9 +704,22 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
     echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '' : $logo);
     if ($menuTonen) {
         echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
+        // Submenu's: pagina's met 'onder' komen in een uitklapmenu onder die pagina
+        $kinderen = [];
+        foreach ($paginas as $slug => $p) {
+            $ouder = (string)($p['onder'] ?? '');
+            if (!empty($p['menu']) && $ouder !== '' && !empty($paginas[$ouder]['menu']) && empty($paginas[$ouder]['onder'])) $kinderen[$ouder][$slug] = $p;
+        }
         foreach ($paginas as $slug => $p) {
             if (empty($p['menu'])) continue;
-            echo '<a href="' . h(paginaUrl($slug)) . '"' . ($slug === $actief ? ' class="actief"' : '') . '>' . h($p['titel']) . '</a>';
+            $ouder = (string)($p['onder'] ?? '');
+            if ($ouder !== '' && isset($kinderen[$ouder][$slug])) continue;
+            $sub = $kinderen[$slug] ?? [];
+            $link = menuLink($slug, $p, $slug === $actief || isset($sub[$actief]), (bool)$sub);
+            if (!$sub) { echo $link; continue; }
+            echo '<div class="menugroep">' . $link . '<div class="submenu">';
+            foreach ($sub as $k => $q) echo menuLink($k, $q, $k === $actief);
+            echo '</div></div>';
         }
         echo '<a href="' . h(url('leden')) . '" class="ledenknop' . ($actief === 'leden' ? ' actief' : '') . '">Leden</a></nav>';
     }

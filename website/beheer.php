@@ -102,6 +102,8 @@ if ($actie !== '') {
             'titel' => $titel,
             'menu' => !empty($_POST['menu']),
             'volgorde' => (int)($_POST['volgorde'] ?? 50),
+            'onder' => (string)($_POST['onder'] ?? ''),
+            'link' => trim(mb_substr((string)($_POST['link'] ?? ''), 0, 500)),
             'concerten' => !empty($_POST['concerten']),
             'tekst' => mb_substr(str_replace("\r\n", "\n", (string)($_POST['tekst'] ?? '')), 0, 100000),
         ];
@@ -113,10 +115,17 @@ if ($actie !== '') {
             $melding = 'Dit webadres kan niet. Gebruik alleen kleine letters, cijfers en streepjes.';
         } elseif ($oud === '' && isset($paginas[$slug])) {
             $melding = 'Er is al een pagina met het adres "' . $slug . '".';
+        } elseif ($formulier['link'] !== '' && !preg_match('~^https?://~i', $formulier['link'])) {
+            $melding = 'Het webadres voor het menu moet beginnen met https://';
         } elseif ($oud !== '' && !isset($paginas[$oud])) {
             $melding = 'Deze pagina bestaat niet meer.';
         } else {
-            $paginas[$slug] = ['titel' => $titel, 'menu' => $formulier['menu'], 'volgorde' => $formulier['volgorde'], 'concerten' => $formulier['concerten'], 'tekst' => $formulier['tekst']];
+            // Submenu: alleen onder een bestaande pagina die zelf geen submenu-item is
+            $onder = $formulier['onder'];
+            if ($onder === $slug || !isset($paginas[$onder]) || !empty($paginas[$onder]['onder'])) $onder = '';
+            $paginas[$slug] = ['titel' => $titel, 'menu' => $formulier['menu'], 'volgorde' => $formulier['volgorde'], 'onder' => $onder, 'link' => $formulier['link'], 'concerten' => $formulier['concerten'], 'tekst' => $formulier['tekst']];
+            // Wordt deze pagina zelf een submenu-item, dan schuiven zijn eigen submenu-items een niveau op
+            if ($onder !== '') foreach ($paginas as $k => $p) if (($p['onder'] ?? '') === $slug) $paginas[$k]['onder'] = '';
             bewaarPaginas($paginas);
             terug($hier, 'Pagina "' . $titel . '" is opgeslagen.');
         }
@@ -286,8 +295,10 @@ if ($tabConcert && isset($_GET['concert'])) {
     }
     echo '</div>';
 } elseif ($nieuw || ($bewerk !== '' && isset($paginas[$bewerk]))) {
-    $w = $formulier ?? ($nieuw ? ['oud' => '', 'adres' => '', 'titel' => '', 'menu' => true, 'volgorde' => 50, 'concerten' => false, 'tekst' => "# Titel\n\n"]
+    $w = $formulier ?? ($nieuw ? ['oud' => '', 'adres' => '', 'titel' => '', 'menu' => true, 'volgorde' => 50, 'onder' => '', 'link' => '', 'concerten' => false, 'tekst' => "# Titel\n\n"]
         : ['oud' => $bewerk, 'adres' => $bewerk] + $paginas[$bewerk]);
+    $w['onder'] = (string)($w['onder'] ?? '');
+    $w['link'] = (string)($w['link'] ?? '');
     echo '<form method="post" class="kaart bewerk">' . $csrf . '<input type="hidden" name="oud" value="' . h($w['oud']) . '">';
     echo '<h2>' . ($w['oud'] === '' ? 'Nieuwe pagina' : 'Pagina bewerken') . '</h2>';
     echo '<label>Titel (ook in het menu)<input name="titel" value="' . h($w['titel']) . '" maxlength="80" required></label>';
@@ -295,7 +306,14 @@ if ($tabConcert && isset($_GET['concert'])) {
     else echo '<p class="stil">Adres: <a href="' . h(paginaUrl($w['oud'])) . '" target="_blank">' . h(paginaUrl($w['oud'])) . '</a></p>';
     echo '<div class="rij"><label class="vink"><input type="checkbox" name="menu" value="1"' . ($w['menu'] ? ' checked' : '') . '> In het menu</label>';
     echo '<label class="vink"><input type="checkbox" name="concerten" value="1"' . ($w['concerten'] ? ' checked' : '') . '> Komende concerten eronder</label>';
-    echo '<label class="smal">Plek in menu<input type="number" name="volgorde" value="' . (int)$w['volgorde'] . '" min="0" max="999"></label></div>';
+    echo '<label class="smal">Plek in menu<input type="number" name="volgorde" value="' . (int)$w['volgorde'] . '" min="0" max="999"></label>';
+    echo '<label class="smal">Submenu van<select name="onder"><option value="">(hoofdmenu)</option>';
+    foreach ($paginas as $k => $p) {
+        if ($k === $w['oud'] || !empty($p['onder']) || empty($p['menu'])) continue;
+        echo '<option value="' . h($k) . '"' . ($w['onder'] === $k ? ' selected' : '') . '>' . h($p['titel']) . '</option>';
+    }
+    echo '</select></label></div>';
+    echo '<label>Menu-item verwijst naar een andere website (leeg = deze pagina)<input type="url" name="link" value="' . h($w['link']) . '" placeholder="https://"></label>';
     echo '<div class="tekstkop"><label for="paginatekst">Tekst</label><button type="button" class="licht klein" data-fotokiezer="paginatekst">📷 Foto invoegen</button></div>';
     echo '<textarea name="tekst" id="paginatekst" rows="18">' . h($w['tekst']) . '</textarea>';
     echo '<details class="hulp"><summary>Hoe maak ik een kop, link, foto of video?</summary><pre>'
@@ -310,7 +328,7 @@ if ($tabConcert && isset($_GET['concert'])) {
 } else {
     echo '<p><a class="knop" href="' . h($hier . '?nieuw=1') . '">+ Nieuwe pagina</a></p><ul class="paginalijst">';
     foreach ($paginas as $slug => $p) {
-        echo '<li><a href="' . h($hier . '?bewerk=' . rawurlencode($slug)) . '"><strong>' . h($p['titel']) . '</strong><small>' . h(paginaUrl($slug)) . (empty($p['menu']) ? ' · niet in menu' : '') . '</small></a>';
+        echo '<li><a href="' . h($hier . '?bewerk=' . rawurlencode($slug)) . '"><strong>' . h($p['titel']) . '</strong><small>' . h(paginaUrl($slug)) . (empty($p['menu']) ? ' · niet in menu' : '') . (!empty($p['onder']) && isset($paginas[$p['onder']]) ? ' · onder ' . h($paginas[$p['onder']]['titel']) : '') . '</small></a>';
         if ($slug !== 'home') echo '<form method="post" onsubmit="return confirm(\'Deze pagina verwijderen?\')">' . $csrf . '<input type="hidden" name="slug" value="' . h($slug) . '"><button name="actie" value="verwijder" class="licht klein">Verwijderen</button></form>';
         echo '</li>';
     }

@@ -30,6 +30,8 @@ if (!geldigeSlug($slug) || !isset($paginas[$slug])) {
 }
 
 $p = $paginas[$slug];
+// Een pagina die alleen een menu-item naar een andere website is: doorsturen
+if ((string)($p['link'] ?? '') !== '' && preg_match('~^https?://~i', (string)$p['link'])) { header('Location: ' . $p['link'], true, 302); exit; }
 kop($CONFIG, $p['titel'], $slug);
 echo '<article class="tekst">' . opmaak((string)$p['tekst']) . '</article>';
 if (!empty($p['concerten'])) {

@@ -40,11 +40,19 @@ img { max-width: 100%; height: auto; display: block; }
 .kop nav a { text-decoration: none; color: var(--tekst); padding: 8px 12px; border-radius: 8px; }
 .kop nav a:hover, .kop nav a.actief { background: var(--kleur-licht); color: var(--kleur); }
 .kop nav a.ledenknop { border: 1px solid var(--kleur); color: var(--kleur); }
+/* submenu's: uitklappen bij aanwijzen of met de tab-toets */
+.menugroep { position: relative; display: flex; }
+.kop nav .pijl { font-size: .75em; margin-left: 4px; opacity: .7; }
+.submenu { display: none; position: absolute; top: 100%; left: 0; z-index: 20; min-width: 230px; flex-direction: column; gap: 2px; padding: 6px; background: var(--kaart); border: 1px solid var(--lijn); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
+.menugroep:hover .submenu, .menugroep:focus-within .submenu { display: flex; }
 .menuknop { display: none; font-size: 1.6rem; cursor: pointer; padding: 4px 8px; }
 @media (max-width: 720px) {
   .menuknop { display: block; }
   .kop nav { display: none; width: 100%; flex-direction: column; padding-bottom: 12px; }
   #menuknop:checked ~ nav { display: flex; }
+  .menugroep { flex-direction: column; }
+  .submenu, .menugroep:hover .submenu { display: flex; position: static; min-width: 0; padding: 0 0 0 16px; border: 0; box-shadow: none; background: none; }
+  .kop nav .pijl { display: none; }
 }
 
 main.binnen { padding-top: 32px; padding-bottom: 48px; min-height: 60vh; }
