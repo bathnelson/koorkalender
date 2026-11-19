@@ -20,9 +20,18 @@ if (!ingelogd('beheer')) {
 }
 
 function terug(string $naar, string $bericht = '', bool $isFout = false): void {
+    if (isset($_GET['ajax'])) antwoordJson([$isFout ? 'fout' : 'bericht' => $bericht]);
     startSessie();
     if ($bericht !== '') $_SESSION[$isFout ? 'bericht_fout' : 'bericht'] = $bericht;
     header('Location: ' . $naar, true, 303);
+    exit;
+}
+
+// Antwoord voor de fotokiezer (uploaden zonder de pagina te verlaten)
+function antwoordJson(array $data): void {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($data);
     exit;
 }
 
@@ -30,6 +39,42 @@ function fotoLijst(): array {
     $f = glob(FOTO_DIR . '/*.{jpg,png,gif,webp}', GLOB_BRACE) ?: [];
     usort($f, function ($a, $b) { return filemtime($b) <=> filemtime($a); });
     return array_map('basename', $f);
+}
+
+// ---- Foto's uit Nextcloud (voor de fotokiezer) ----
+// Map in Nextcloud waar de kiezer begint, bijv. '7. media/Foto\'s'. Leeg = de hoofdmap.
+function ncFotoPad(array $cfg, string $sub): ?string {
+    $sub = ncSchoonPad($sub);
+    $basis = ncSchoonPad((string)($cfg['nextcloud_fotomap'] ?? ''));
+    if ($sub === null || $basis === null) return null;
+    return trim($basis . '/' . $sub, '/');
+}
+const FOTO_EXT = '/\.(jpe?g|png|gif|webp)$/i';
+
+if (isset($_GET['ncfotos'])) {
+    if (!ncAan($CONFIG)) antwoordJson(['fout' => 'Log eerst in op de ledenpagina met je Nextcloud-account (in een nieuw tabblad van deze browser), en kom dan hier terug.', 'inlog' => url('leden')]);
+    $sub = ncSchoonPad((string)($_GET['map'] ?? '')) ?? '';
+    $pad = ncFotoPad($CONFIG, $sub);
+    session_write_close();
+    $lijst = $pad === null ? 'Ongeldige map.' : ncLijst($CONFIG, $pad);
+    if (is_string($lijst)) antwoordJson(['fout' => $lijst]);
+    antwoordJson([
+        'map' => $sub,
+        'mappen' => array_map(function ($m) { return $m['naam']; }, $lijst['mappen']),
+        'fotos' => array_values(array_map(function ($b) { return $b['naam']; }, array_filter($lijst['bestanden'], function ($b) { return preg_match(FOTO_EXT, $b['naam']); }))),
+    ]);
+}
+if (isset($_GET['ncvoorbeeld'])) {
+    $pad = ncAan($CONFIG) ? ncFotoPad($CONFIG, (string)$_GET['ncvoorbeeld']) : null;
+    session_write_close();
+    $data = $pad !== null && preg_match(FOTO_EXT, $pad) ? (ncOphalen($CONFIG, $pad, true) ?? ncOphalen($CONFIG, $pad, false, 8 * 1024 * 1024)) : null;
+    $soort = $data !== null ? (new finfo(FILEINFO_MIME_TYPE))->buffer($data) : '';
+    if (!in_array($soort, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) { http_response_code(404); exit; }
+    header('Content-Type: ' . $soort);
+    header('X-Content-Type-Options: nosniff');
+    header('Cache-Control: private, max-age=86400');
+    echo $data;
+    exit;
 }
 
 $paginas = laadPaginas();
@@ -89,6 +134,29 @@ if ($actie !== '') {
         terug($hier);
     }
 
+    // Een foto uit Nextcloud naar de website kopiëren (verkleind), zodat de site niet van Nextcloud afhangt
+    if ($actie === 'nc_foto') {
+        $pad = ncAan($CONFIG) ? ncFotoPad($CONFIG, (string)($_POST['pad'] ?? '')) : null;
+        if ($pad === null || !preg_match(FOTO_EXT, $pad)) antwoordJson(['fout' => 'Ongeldige foto.']);
+        session_write_close();
+        $data = ncOphalen($CONFIG, $pad);
+        if ($data === null) antwoordJson(['fout' => 'De foto kon niet uit Nextcloud gehaald worden (of is groter dan 40 MB).']);
+        $tmp = tempnam(sys_get_temp_dir(), 'wkh');
+        file_put_contents($tmp, $data);
+        $info = @getimagesize($tmp);
+        $ext = $info ? (FOTO_SOORTEN[$info[2]] ?? null) : null;
+        if (!$ext) { @unlink($tmp); antwoordJson(['fout' => 'Dit is geen foto (alleen jpg, png, gif of webp).']); }
+        verkleinFoto($tmp);
+        if (!is_dir(FOTO_DIR)) mkdir(FOTO_DIR, 0775, true);
+        $basis = maakSlug(pathinfo($pad, PATHINFO_FILENAME)) ?: 'foto';
+        $naam = $basis . '.' . $ext;
+        for ($i = 2; is_file(FOTO_DIR . '/' . $naam); $i++) $naam = $basis . '-' . $i . '.' . $ext;
+        if (!@rename($tmp, FOTO_DIR . '/' . $naam) && !@copy($tmp, FOTO_DIR . '/' . $naam)) { @unlink($tmp); antwoordJson(['fout' => 'Opslaan mislukt: de map inhoud/fotos is niet schrijfbaar.']); }
+        @unlink($tmp);
+        @chmod(FOTO_DIR . '/' . $naam, 0644);
+        antwoordJson(['naam' => $naam, 'src' => url('inhoud/fotos/' . $naam)]);
+    }
+
     if ($actie === 'foto') {
         $f = $_FILES['foto'] ?? null;
         $fout = null;
@@ -106,6 +174,7 @@ if ($actie !== '') {
                 $naam = $basis . '.' . $ext;
                 for ($i = 2; is_file(FOTO_DIR . '/' . $naam); $i++) $naam = $basis . '-' . $i . '.' . $ext;
                 if (!move_uploaded_file($f['tmp_name'], FOTO_DIR . '/' . $naam)) $fout = 'Opslaan mislukt: de map inhoud/fotos is niet schrijfbaar.';
+                elseif (isset($_GET['ajax'])) antwoordJson(['naam' => $naam, 'src' => url('inhoud/fotos/' . $naam)]);
                 else terug($hier . '?fotos=1', 'Foto "' . $naam . '" staat erop. Zet in een pagina: ![onderschrift](fotos/' . $naam . ')');
             }
         }
@@ -182,9 +251,7 @@ if ($tabConcert && isset($_GET['concert'])) {
     echo '<div class="rij"><label class="smal">Hoe laat<input name="tijd" value="' . $v('tijd') . '"' . $ph('tijd') . ' placeholder="bijv. 15:00-16:30"></label>';
     echo '<label style="flex:1">Waar<input name="waar" value="' . $v('waar') . '"' . $ph('waar') . '></label></div>';
     echo '<label>Beschrijving<textarea name="beschrijving" rows="6">' . $v('beschrijving') . '</textarea></label>';
-    echo '<label>Foto (kies uit je foto\'s, of plak een webadres)<input name="foto" value="' . $v('foto') . '" list="fotolijst" placeholder="fotos/naam.jpg"></label><datalist id="fotolijst">';
-    foreach (fotoLijst() as $f) echo '<option value="fotos/' . h($f) . '">';
-    echo '</datalist>';
+    echo '<label>Foto<span class="fotoveld"><input name="foto" id="concertfoto" value="' . $v('foto') . '" placeholder="fotos/naam.jpg of een webadres"><button type="button" class="licht" data-fotokiezer="concertfoto">Kies foto</button></span></label>';
     echo '<label>Link naar de locatie (bijv. Google Maps of de website van de zaal)<input type="url" name="locatie_url" value="' . $v('locatie_url') . '" placeholder="https://"></label>';
     echo '<label>Link naar de kaartverkoop<input type="url" name="kaarten_url" value="' . $v('kaarten_url') . '" placeholder="https://"></label>';
     if ($kal) echo '<label class="vink"><input type="checkbox" name="verborgen" value="1"' . (!empty($w['verborgen']) ? ' checked' : '') . '> Niet op de website tonen</label>';
@@ -212,35 +279,6 @@ if ($tabConcert && isset($_GET['concert'])) {
     }
 } elseif (isset($_GET['fotos'])) {
     echo '<form method="post" enctype="multipart/form-data" class="kaart">' . $csrf . '<h2>Foto toevoegen</h2><input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/gif,image/webp" required> <button name="actie" value="foto" id="fotoknop">Uploaden</button><p class="stil">Grote foto\'s worden vóór het uploaden automatisch verkleind tot maximaal 1600 pixels breed. Na het uploaden zie je hieronder de regel die je in een pagina plakt. Zet je meerdere foto-regels direct onder elkaar, dan worden ze een fotogalerij.</p></form>';
-    echo <<<'JS'
-<script>
-// Verkleint grote foto's in de browser vóór het uploaden, zodat de uploadlimiet van de host geen probleem is
-(function () {
-  const veld = document.getElementById('foto'), knop = document.getElementById('fotoknop');
-  if (!veld || !window.DataTransfer || !HTMLCanvasElement.prototype.toBlob) return;
-  const MAX = 1600;
-  veld.addEventListener('change', async () => {
-    const f = veld.files[0];
-    if (!f || !/^image\/(jpeg|png|webp)$/.test(f.type)) return;
-    knop.disabled = true; knop.textContent = 'Verkleinen…';
-    try {
-      const img = await createImageBitmap(f, { imageOrientation: 'from-image' });
-      const schaal = Math.min(1, MAX / Math.max(img.width, img.height));
-      if (schaal === 1 && f.size < 1500000) return;
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * schaal); c.height = Math.round(img.height * schaal);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      const blob = await new Promise(k => c.toBlob(k, 'image/jpeg', 0.82));
-      if (!blob) return;
-      const dt = new DataTransfer();
-      dt.items.add(new File([blob], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }));
-      veld.files = dt.files;
-    } catch (e) { /* lukt verkleinen niet, dan gaat het origineel */ }
-    finally { knop.disabled = false; knop.textContent = 'Uploaden'; }
-  });
-})();
-</script>
-JS;
     echo '<div class="fotobeheer">';
     foreach (fotoLijst() as $naam) {
         echo '<figure><img src="' . h(url('inhoud/fotos/' . $naam)) . '" alt="" loading="lazy"><figcaption><code>![](fotos/' . h($naam) . ')</code>'
@@ -258,7 +296,8 @@ JS;
     echo '<div class="rij"><label class="vink"><input type="checkbox" name="menu" value="1"' . ($w['menu'] ? ' checked' : '') . '> In het menu</label>';
     echo '<label class="vink"><input type="checkbox" name="concerten" value="1"' . ($w['concerten'] ? ' checked' : '') . '> Komende concerten eronder</label>';
     echo '<label class="smal">Plek in menu<input type="number" name="volgorde" value="' . (int)$w['volgorde'] . '" min="0" max="999"></label></div>';
-    echo '<label>Tekst<textarea name="tekst" rows="18">' . h($w['tekst']) . '</textarea></label>';
+    echo '<div class="tekstkop"><label for="paginatekst">Tekst</label><button type="button" class="licht klein" data-fotokiezer="paginatekst">📷 Foto invoegen</button></div>';
+    echo '<textarea name="tekst" id="paginatekst" rows="18">' . h($w['tekst']) . '</textarea>';
     echo '<details class="hulp"><summary>Hoe maak ik een kop, link, foto of video?</summary><pre>'
         . h("# Grote kop\n## Kleinere kop\n**vetgedrukt**   *schuin*\n- opsomming\n1. genummerde lijst\n[tekst van de link](https://www.voorbeeld.nl)\n[naar een andere pagina](over-ons)\n![onderschrift](fotos/naam.jpg)\nyoutube: https://www.youtube.com/watch?v=...\ntegel: [Titel](andere-pagina) https://www.youtube.com/watch?v=...\nknop: [Kaartjes kopen](https://...)")
         . '</pre><p>Een lege regel begint een nieuwe alinea. Foto-regels direct onder elkaar worden een fotogalerij. Tegel-regels onder elkaar worden een raster met plaatjes; bij een YouTube-adres komt het plaatje van de video erin, je kunt ook fotos/naam.jpg gebruiken.</p></details>';
@@ -277,4 +316,8 @@ JS;
     }
     echo '</ul><p class="stil">Er wordt bij elke wijziging automatisch een reservekopie bewaard (map inhoud/backup, de laatste 50).</p>';
 }
+// Gegevens voor de fotokiezer en het verkleinen van foto's (beheer.js)
+$fotoData = ['upload' => $hier . '?ajax=1', 'nc' => ncAan($CONFIG) || ssoAan($CONFIG) ? $hier : null, 'csrf' => csrfToken(), 'fotos' => array_map(function ($n) { return ['naam' => $n, 'src' => url('inhoud/fotos/' . $n)]; }, fotoLijst())];
+echo '<script type="application/json" id="fotodata">' . json_encode($fotoData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) . '</script>';
+echo '<script src="' . h(url('beheer.js')) . '?v=' . @filemtime(__DIR__ . '/beheer.js') . '" defer></script>';
 voet($CONFIG);
