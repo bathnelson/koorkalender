@@ -61,7 +61,7 @@ tegel: [Titel](https://www.youtube.com/watch?v=...)
 tegel: [Titel](pagina) fotos/naam.jpg
 ```
 
-Foto-regels direct onder elkaar worden een fotogalerij in metselwerk-stijl (masonry); een klik opent de foto groot, met pijltjes naar de volgende. Een video laat eerst alleen de miniatuur zien en laadt de speler pas na een klik. Tegel-regels onder elkaar worden een raster van tegels met plaatje en titel. HTML in de tekst werkt bewust niet.
+Foto-regels direct onder elkaar worden een fotogalerij in rijen van gelijke hoogte (masonry); een klik opent de foto groot, met pijltjes naar de volgende. Een video laat eerst alleen de miniatuur zien en laadt de speler pas na een klik. Tegel-regels onder elkaar worden een raster van tegels met plaatje en titel. HTML in de tekst werkt bewust niet.
 
 ## Foto's kiezen
 

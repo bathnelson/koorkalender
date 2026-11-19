@@ -234,7 +234,11 @@ function opmaak(string $tekst): string {
             $adres = veiligAdres($m[2]);
             if ($adres !== null) {
                 $onder = $m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '';
-                $galerij[] = '<figure><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '" loading="lazy"></a>' . $onder . '</figure>';
+                // Bij eigen foto's de verhouding meegeven, zodat de galerij meteen goed staat
+                $maat = preg_match('~^fotos/([A-Za-z0-9._-]+)$~', $m[2], $f) ? @getimagesize(FOTO_DIR . '/' . $f[1]) : false;
+                $r = $maat && $maat[1] > 0 ? round($maat[0] / $maat[1], 3) : null;
+                $galerij[] = '<figure' . ($r ? ' style="--r:' . $r . '"' : '') . '><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '"'
+                    . ($maat ? ' width="' . (int)$maat[0] . '" height="' . (int)$maat[1] . '"' : '') . ' loading="lazy"></a>' . $onder . '</figure>';
             }
             continue;
         }
