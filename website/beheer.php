@@ -131,6 +131,28 @@ if ($actie !== '') {
         }
     }
 
+    // Menu-indeling vanuit de versleepbare lijst: volgorde, submenu en wel of niet in het menu
+    if ($actie === 'menu_opslaan') {
+        $lijst = json_decode((string)($_POST['menu'] ?? ''), true);
+        if (!is_array($lijst)) antwoordJson(['fout' => 'Ongeldige gegevens.']);
+        $volgorde = 0;
+        $ouder = '';
+        $gezien = [];
+        foreach ($lijst as $r) {
+            $slug = (string)($r['s'] ?? '');
+            if (!isset($paginas[$slug]) || isset($gezien[$slug])) continue;
+            $gezien[$slug] = true;
+            $inMenu = !empty($r['m']);
+            $sub = $inMenu && !empty($r['d']) && $ouder !== '' && $slug !== 'home';
+            $paginas[$slug]['menu'] = $inMenu;
+            $paginas[$slug]['onder'] = $sub ? $ouder : '';
+            $paginas[$slug]['volgorde'] = $volgorde += 10;
+            if ($inMenu && !$sub) $ouder = $slug;
+        }
+        bewaarPaginas($paginas);
+        antwoordJson(['bericht' => 'Opgeslagen']);
+    }
+
     if ($actie === 'verwijder') {
         $slug = (string)($_POST['slug'] ?? '');
         if ($slug === 'home') terug($hier, 'De homepagina kan niet weg.', true);
@@ -362,12 +384,29 @@ if ($tabConcert && isset($_GET['concert'])) {
         echo '</section>';
     }
 } else {
-    echo '<p><a class="knop" href="' . h($hier . '?nieuw=1') . '">+ Nieuwe pagina</a></p><ul class="paginalijst">';
+    // Pagina's in menuvolgorde: hoofditems met direct daaronder hun submenu-items, daarna de pagina's buiten het menu
+    $inMenu = []; $los = [];
     foreach ($paginas as $slug => $p) {
-        echo '<li><a href="' . h($hier . '?bewerk=' . rawurlencode($slug)) . '"><strong>' . h($p['titel']) . '</strong><small>' . h(paginaUrl($slug)) . (empty($p['menu']) ? ' · niet in menu' : '') . (!empty($p['onder']) && isset($paginas[$p['onder']]) ? ' · onder ' . h($paginas[$p['onder']]['titel']) : '') . '</small></a>';
-        if ($slug !== 'home') echo '<form method="post" onsubmit="return confirm(\'Deze pagina verwijderen?\')">' . $csrf . '<input type="hidden" name="slug" value="' . h($slug) . '"><button name="actie" value="verwijder" class="licht klein">Verwijderen</button></form>';
-        echo '</li>';
+        if (empty($p['menu'])) { $los[] = $slug; continue; }
+        $o = (string)($p['onder'] ?? '');
+        if ($o !== '' && !empty($paginas[$o]['menu']) && empty($paginas[$o]['onder'])) continue;
+        $inMenu[] = [$slug, 0];
+        foreach ($paginas as $k => $q) if (!empty($q['menu']) && ($q['onder'] ?? '') === $slug) $inMenu[] = [$k, 1];
     }
+    $rij = function (string $slug, int $diepte) use ($paginas, $hier, $csrf) {
+        $p = $paginas[$slug];
+        $uit = '<li data-slug="' . h($slug) . '" data-diepte="' . $diepte . '"><span class="greep" title="Slepen om te verplaatsen" aria-hidden="true">⠿</span>'
+            . '<a href="' . h($hier . '?bewerk=' . rawurlencode($slug)) . '"><strong>' . h($p['titel']) . '</strong><small>' . h(paginaUrl($slug)) . ((string)($p['link'] ?? '') !== '' ? ' · verwijst naar ' . h($p['link']) : '') . '</small></a>';
+        if ($slug !== 'home') $uit .= '<form method="post" onsubmit="return confirm(\'Deze pagina verwijderen?\')">' . $csrf . '<input type="hidden" name="slug" value="' . h($slug) . '"><button name="actie" value="verwijder" class="licht klein">Verwijderen</button></form>';
+        return $uit . '</li>';
+    };
+    echo '<p><a class="knop" href="' . h($hier . '?nieuw=1') . '">+ Nieuwe pagina</a></p>';
+    echo '<div class="menukop"><h2>Menu</h2><span id="menustatus" class="stil" aria-live="polite"></span></div>';
+    echo '<p class="stil">Sleep een pagina aan ⠿ omhoog of omlaag voor de volgorde. Sleep naar rechts om hem in het submenu van de pagina erboven te zetten, en naar links om hem terug te zetten. Wijzigingen worden meteen bewaard.</p>';
+    echo '<ul class="paginalijst menulijst" id="menulijst">';
+    foreach ($inMenu as [$slug, $d]) echo $rij($slug, $d);
+    echo '</ul><h2>Niet in het menu</h2><p class="stil">Deze pagina\'s zijn wel te bereiken via een link. Sleep er een naar boven om hem in het menu te zetten.</p><ul class="paginalijst menulijst" id="losselijst">';
+    foreach ($los as $slug) echo $rij($slug, 0);
     echo '</ul><p class="stil">Er wordt bij elke wijziging automatisch een reservekopie bewaard (map inhoud/backup, de laatste 50).</p>';
 }
 // Gegevens voor de fotokiezer en het verkleinen van foto's (beheer.js)
