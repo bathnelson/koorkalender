@@ -146,7 +146,8 @@ function standaardPaginas(): array {
 //   # Kop, ## Kleinere kop     **vet**   *schuin*   [tekst](https://link)
 //   - opsomming                1. genummerd
 //   ![onderschrift](fotos/naam.jpg)   losse foto's onder elkaar worden een fotogalerij
-//   youtube: https://www.youtube.com/watch?v=...   wordt een video
+//   youtube: https://www.youtube.com/watch?v=...   wordt een video (speler laadt pas na een klik)
+//   tegel: [Titel](pagina) https://youtube.../fotos/x.jpg   tegels onder elkaar worden een raster met plaatjes
 //   knop: [Kaartjes](https://...)                  wordt een knop
 //
 // Alle tekst wordt eerst ontsmet, dus HTML in de tekst doet niets.
@@ -184,6 +185,7 @@ function opmaak(string $tekst): string {
     $alinea = [];
     $lijst = null; // 'ul' of 'ol'
     $galerij = [];
+    $tegels = [];
 
     $sluitTekst = function () use (&$uit, &$alinea, &$lijst) {
         if ($alinea) { $uit[] = '<p>' . implode('<br>', array_map('inline', $alinea)) . '</p>'; $alinea = []; }
@@ -195,9 +197,36 @@ function opmaak(string $tekst): string {
         $galerij = [];
     };
 
+    $sluitTegels = function () use (&$uit, &$tegels) {
+        if (!$tegels) return;
+        $uit[] = '<div class="tegels">' . implode('', $tegels) . '</div>';
+        $tegels = [];
+    };
+
     foreach (preg_split('/\r\n|\r|\n/', $tekst) as $r) {
         $t = trim($r);
-        if ($t === '') { $sluitTekst(); $sluitGalerij(); continue; }
+        if ($t === '') { $sluitTekst(); $sluitGalerij(); $sluitTegels(); continue; }
+
+        // tegel: [Titel](pagina) plaatje-of-youtube-adres
+        if (preg_match('/^tegel:\s*\[([^\]]+)\]\(([^)\s]+)\)\s*(\S+)?$/i', $t, $m)) {
+            $sluitTekst(); $sluitGalerij();
+            $doel = veiligAdres($m[2]);
+            $bron = $m[3] ?? '';
+            $id = $bron !== '' ? youtubeId($bron) : null;
+            $plaatje = $id ? 'https://i.ytimg.com/vi/' . $id . '/hqdefault.jpg' : ($bron !== '' ? veiligAdres($bron) : null);
+            if ($doel !== null && $id) {
+                // video: de speler staat in de tegel zelf, de titel gaat naar de pagina
+                $tegels[] = '<div class="tegel isvideo"><div class="video"><a class="speel" href="https://www.youtube.com/watch?v=' . h($id) . '" data-yt="' . h($id) . '" target="_blank" rel="noopener">'
+                    . '<img src="' . h($plaatje) . '" alt="" loading="lazy"><span class="knopje">▶</span></a></div>'
+                    . '<a class="naam" href="' . h($doel) . '">' . h($m[1]) . '</a></div>';
+            } elseif ($doel !== null) {
+                $tegels[] = '<a class="tegel' . ($id ? ' isvideo' : '') . '" href="' . h($doel) . '">'
+                    . ($plaatje ? '<span class="beeld"><img src="' . h($plaatje) . '" alt="" loading="lazy"></span>' : '')
+                    . '<span class="naam">' . h($m[1]) . '</span></a>';
+            }
+            continue;
+        }
+        $sluitTegels();
 
         // foto: ![onderschrift](fotos/naam.jpg)
         if (preg_match('/^!\[([^\]]*)\]\(([^)\s]+)\)$/', $t, $m)) {
@@ -214,7 +243,7 @@ function opmaak(string $tekst): string {
         if (preg_match('/^youtube:\s*(\S+)$/i', $t, $m)) {
             $sluitTekst();
             $id = youtubeId($m[1]);
-            if ($id) $uit[] = '<div class="video"><iframe src="https://www.youtube-nocookie.com/embed/' . h($id) . '" title="Video" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy"></iframe></div>';
+            if ($id) $uit[] = '<div class="video"><a class="speel" href="https://www.youtube.com/watch?v=' . h($id) . '" data-yt="' . h($id) . '" target="_blank" rel="noopener" aria-label="Video afspelen"><img src="https://i.ytimg.com/vi/' . h($id) . '/hqdefault.jpg" alt="" loading="lazy"><span class="knopje">▶</span></a></div>';
             continue;
         }
         if (preg_match('/^knop:\s*\[([^\]]+)\]\(([^)\s]+)\)$/i', $t, $m)) {
@@ -241,25 +270,72 @@ function opmaak(string $tekst): string {
     }
     $sluitTekst();
     $sluitGalerij();
+    $sluitTegels();
     return implode("\n", $uit);
 }
 
-// ---------- concerten uit de koorkalender ----------
+// ---------- concerten ----------
+//
+// Optredens uit de jaarkalender verschijnen vanzelf. Op de beheerpagina kun je ze aanvullen met een beschrijving,
+// foto en links (inhoud/concerten.json, onder 'extra' met het id uit de kalender), en eigen concerten toevoegen
+// die niet in de kalender staan (onder 'eigen').
 
-function komendeConcerten(array $cfg, int $max = 20): array {
+const CONCERTEN_FILE = INHOUD_DIR . '/concerten.json';
+const CONCERT_VELDEN = ['titel', 'datum', 'tijd', 'waar', 'beschrijving', 'foto', 'locatie_url', 'kaarten_url'];
+
+function laadConcertInfo(): array {
+    $d = is_file(CONCERTEN_FILE) ? json_decode((string)file_get_contents(CONCERTEN_FILE), true) : null;
+    return ['extra' => is_array($d['extra'] ?? null) ? $d['extra'] : [], 'eigen' => is_array($d['eigen'] ?? null) ? $d['eigen'] : []];
+}
+
+function bewaarConcertInfo(array $info): void {
+    if (!is_dir(INHOUD_DIR)) mkdir(INHOUD_DIR, 0775, true);
+    $tmp = CONCERTEN_FILE . '.tmp';
+    if (file_put_contents($tmp, json_encode(['versie' => 1] + $info, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)) === false || !rename($tmp, CONCERTEN_FILE)) {
+        http_response_code(500);
+        exit('Opslaan mislukt: de map inhoud/ is niet schrijfbaar.');
+    }
+}
+
+// Optredens uit de jaarkalender, per id
+function kalenderOptredens(array $cfg): array {
     $bestand = (string)($cfg['kalender_data'] ?? '');
     if ($bestand === '' || !is_file($bestand)) return [];
     $data = json_decode((string)file_get_contents($bestand), true);
-    $items = is_array($data['items'] ?? null) ? $data['items'] : [];
-    $vandaag = date('Y-m-d');
     $uit = [];
-    foreach ($items as $i) {
-        if (($i['soort'] ?? '') !== 'Optreden') continue;
-        $eind = ($i['tm'] ?? '') !== '' ? $i['tm'] : ($i['datum'] ?? '');
-        if ($eind < $vandaag) continue;
-        $uit[] = $i;
+    foreach ((is_array($data['items'] ?? null) ? $data['items'] : []) as $i) {
+        if (($i['soort'] ?? '') === 'Optreden' && !empty($i['id'])) $uit[(string)$i['id']] = $i;
     }
-    usort($uit, function ($a, $b) { return [$a['datum'], $a['tijd'] ?? ''] <=> [$b['datum'], $b['tijd'] ?? '']; });
+    return $uit;
+}
+
+// Alle concerten (kalender + eigen), met aanvullingen. Elk concert krijgt 'bron' (kalender/eigen) en 'sleutel'.
+function alleConcerten(array $cfg, bool $metVerborgen = false): array {
+    $info = laadConcertInfo();
+    $uit = [];
+    foreach (kalenderOptredens($cfg) as $id => $k) {
+        $x = $info['extra'][$id] ?? [];
+        if (!$metVerborgen && !empty($x['verborgen'])) continue;
+        $c = ['bron' => 'kalender', 'sleutel' => $id, 'tm' => (string)($k['tm'] ?? ''), 'verborgen' => !empty($x['verborgen']), 'kalender' => $k];
+        foreach (CONCERT_VELDEN as $v) {
+            $c[$v] = (string)(($x[$v] ?? '') !== '' ? $x[$v] : ($k[$v] ?? ''));
+        }
+        $uit[] = $c;
+    }
+    foreach ($info['eigen'] as $id => $e) {
+        $c = ['bron' => 'eigen', 'sleutel' => (string)$id, 'tm' => '', 'verborgen' => false];
+        foreach (CONCERT_VELDEN as $v) $c[$v] = (string)($e[$v] ?? '');
+        $uit[] = $c;
+    }
+    usort($uit, function ($a, $b) { return [$a['datum'], $a['tijd']] <=> [$b['datum'], $b['tijd']]; });
+    return $uit;
+}
+
+function komendeConcerten(array $cfg, int $max = 20): array {
+    $vandaag = date('Y-m-d');
+    $uit = array_values(array_filter(alleConcerten($cfg), function ($c) use ($vandaag) {
+        return ($c['tm'] !== '' ? $c['tm'] : $c['datum']) >= $vandaag;
+    }));
     return array_slice($uit, 0, $max);
 }
 
@@ -274,15 +350,22 @@ function datumNL(string $iso): string {
 function concertenHtml(array $cfg): string {
     $lijst = komendeConcerten($cfg);
     if (!$lijst) return '<p class="stil">Er staan op dit moment geen concerten gepland. Kijk binnenkort nog eens!</p>';
-    $uit = '<ul class="concerten">';
+    $uit = '<div class="concerten">';
     foreach ($lijst as $c) {
-        $wanneer = datumNL($c['datum']) . (($c['tm'] ?? '') !== '' ? ' t/m ' . datumNL($c['tm']) : '');
-        $uit .= '<li><div class="wanneer">' . h($wanneer) . (($c['tijd'] ?? '') !== '' ? ' · ' . h(str_replace('-', '–', $c['tijd'])) : '') . '</div>'
-            . '<div class="wat">' . h($c['titel'] ?? '') . '</div>'
-            . (($c['waar'] ?? '') !== '' ? '<div class="waar">' . h($c['waar']) . '</div>' : '')
-            . '</li>';
+        $wanneer = datumNL($c['datum']) . ($c['tm'] !== '' ? ' t/m ' . datumNL($c['tm']) : '');
+        $foto = $c['foto'] !== '' ? veiligAdres($c['foto']) : null;
+        $locatie = $c['locatie_url'] !== '' ? veiligAdres($c['locatie_url']) : null;
+        $kaarten = $c['kaarten_url'] !== '' ? veiligAdres($c['kaarten_url']) : null;
+        $uit .= '<article class="concert">'
+            . ($foto ? '<div class="concertfoto"><img src="' . h($foto) . '" alt="" loading="lazy"></div>' : '')
+            . '<div class="concerttekst"><div class="wanneer">' . h($wanneer) . ($c['tijd'] !== '' ? ' · ' . h(str_replace('-', '–', $c['tijd'])) : '') . '</div>'
+            . '<h3 class="wat">' . h($c['titel']) . '</h3>'
+            . ($c['waar'] !== '' ? '<div class="waar">📍 ' . ($locatie ? '<a href="' . h($locatie) . '" target="_blank" rel="noopener">' . h($c['waar']) . '</a>' : h($c['waar'])) . '</div>' : '')
+            . ($c['beschrijving'] !== '' ? '<div class="beschrijving">' . opmaak($c['beschrijving']) . '</div>' : '')
+            . ($kaarten ? '<p><a class="knop" href="' . h($kaarten) . '" target="_blank" rel="noopener">Kaarten</a></p>' : '')
+            . '</div></article>';
     }
-    return $uit . '</ul>';
+    return $uit . '</div>';
 }
 
 // ---------- Nextcloud (alleen lezen, via WebDAV) ----------
@@ -553,7 +636,12 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
     echo '<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<title>' . h($titel === '' || $titel === 'Home' ? $cfg['naam'] : $titel . ' | ' . $cfg['naam']) . '</title>';
     echo '<link rel="stylesheet" href="' . h(url('stijl.css')) . '?v=' . @filemtime(__DIR__ . '/stijl.css') . '"></head><body>';
-    echo '<header class="kop"><div class="binnen"><a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
+    $banner = (string)($cfg['kop_afbeelding'] ?? '');
+    $banner = $banner !== '' ? veiligAdres($banner) : null;
+    // Met een kopfoto staat de naam van het koor over de foto heen; anders links in de menubalk
+    $logo = '<a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
+    if ($banner) echo '<div class="banner"><img src="' . h($banner) . '" alt="">' . $logo . '</div>';
+    echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '' : $logo);
     if ($menuTonen) {
         echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
         foreach ($paginas as $slug => $p) {
@@ -566,5 +654,6 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
 }
 
 function voet(array $cfg): void {
-    echo '</main><footer class="voet"><div class="binnen">© ' . date('Y') . ' ' . h($cfg['naam']) . '</div></footer></body></html>';
+    echo '</main><footer class="voet"><div class="binnen">© ' . date('Y') . ' ' . h($cfg['naam']) . '</div></footer>';
+    echo '<script src="' . h(url('site.js')) . '?v=' . @filemtime(__DIR__ . '/site.js') . '" defer></script></body></html>';
 }

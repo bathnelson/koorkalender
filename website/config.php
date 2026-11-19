@@ -8,6 +8,9 @@ return [
     // Korte zin onder de naam
     'ondertitel' => 'Liederen uit de hele wereld',
 
+    // Brede foto bovenaan elke pagina: een volledig webadres of fotos/naam.jpg (upload via Beheer > Foto's). Leeg = geen.
+    'kop_afbeelding' => 'https://static.wixstatic.com/media/26b1aa_edd05c05fbe54fdabf400035a913807b~mv2.png',
+
     // Wachtwoord voor de beheerpagina (/beheer). Zolang hier 'verander-mij' staat, kan niemand inloggen.
     // Mag ook een hash zijn die begint met $2y$ (gemaakt met password_hash).
     'beheer_wachtwoord' => 'verander-mij',
