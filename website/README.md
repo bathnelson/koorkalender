@@ -67,13 +67,9 @@ Foto-regels direct onder elkaar worden een fotogalerij in rijen van gelijke hoog
 
 In het beheer staat bij een pagina de knop **Foto invoegen** en bij een concert **Kies foto**. Je kiest dan uit de foto's op de website, uploadt een nieuwe, of bladert onder **Uit Nextcloud** door de foto's in Nextcloud. Een foto uit Nextcloud wordt verkleind (maximaal 1600 pixels) naar de website gekopieerd, zodat de site niet afhangt van Nextcloud. Met `nextcloud_fotomap` in `config.php` stel je de map in waar de kiezer begint. De kiezer gebruikt het website-account (`nextcloud_gebruiker`), of anders het Nextcloud-account waarmee je in hetzelfde browservenster op de ledenpagina bent ingelogd.
 
-## Kopfoto
-
-In `config.php` zet je bij `kop_afbeelding` een webadres of `fotos/naam.jpg` (upload via Beheer > Foto's). Die foto staat breed bovenaan elke pagina.
-
 ## Subsidiegevers in de voettekst
 
-Onderaan elke pagina staat "Mede mogelijk gemaakt door" met de logo's uit `subsidiegevers` in `config.php`. Upload het logo via Beheer > Foto's (bijv. als `logo-gemeente-haarlem.png`) en zet die naam bij `logo`. Zolang het logo er niet is, staat de naam er als tekst. Meer gevers of sponsors voeg je toe als extra regel.
+Onderaan elke pagina staat "Mede mogelijk gemaakt door" met de logo's van subsidiegevers en sponsors. Die stel je in onder Beheer > Algemeen, met de fotokiezer voor het logo. Daar pas je ook de naam, de ondertitel en de kopfoto aan.
 
 ## Concertagenda
 

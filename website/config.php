@@ -2,14 +2,13 @@
 // Instellingen voor de website. Pas alleen de waarden tussen de aanhalingstekens aan.
 // Zet de echte wachtwoorden alleen op de host, nooit in git.
 return [
+    // Naam, ondertitel, kopfoto en voettekst pas je aan in Beheer > Algemeen. Wat hier staat is alleen de beginwaarde.
+
     // Naam van het koor, bovenaan elke pagina
     'naam' => 'Wereldkoor Haarlem',
 
     // Korte zin onder de naam
     'ondertitel' => 'Liederen uit de hele wereld',
-
-    // Brede foto bovenaan elke pagina: een volledig webadres of fotos/naam.jpg (upload via Beheer > Foto's). Leeg = geen.
-    'kop_afbeelding' => 'https://static.wixstatic.com/media/26b1aa_edd05c05fbe54fdabf400035a913807b~mv2.png',
 
     // Wachtwoord voor de beheerpagina (/beheer). Zolang hier 'verander-mij' staat, kan niemand inloggen.
     // Mag ook een hash zijn die begint met $2y$ (gemaakt met password_hash).
@@ -20,12 +19,6 @@ return [
     // Gebruik je "Inloggen met Nextcloud" (zie hieronder), dan kun je dit op 'verander-mij' laten staan.
     'leden_wachtwoord' => 'verander-mij',
 
-    // ---- Voettekst: subsidiegevers en sponsors, onderaan elke pagina ----
-    'subsidie_tekst' => 'Mede mogelijk gemaakt door',
-    // Per gever: naam, logo (upload via Beheer > Foto's en zet hier fotos/naam.png) en link. Zolang het logo er niet is, staat de naam er.
-    'subsidiegevers' => [
-        ['naam' => 'Gemeente Haarlem', 'logo' => 'fotos/logo-gemeente-haarlem.png', 'link' => 'https://www.haarlem.nl'],
-    ],
 
     // ---- Jaarkalender (de koorkalender op dezelfde host) ----
 

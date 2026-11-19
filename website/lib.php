@@ -11,6 +11,24 @@ const PAGINAS_FILE = INHOUD_DIR . '/paginas.json';
 const FOTO_DIR = INHOUD_DIR . '/fotos';
 const BACKUP_DIR = INHOUD_DIR . '/backup';
 const MAX_BACKUPS = 50;
+const INSTELLINGEN_FILE = INHOUD_DIR . '/instellingen.json';
+// Deze instellingen kun je ook in het beheer aanpassen; wat daar is opgeslagen gaat voor config.php
+const BEHEER_INSTELLINGEN = ['naam', 'ondertitel', 'kop_afbeelding', 'subsidie_tekst', 'subsidiegevers'];
+
+function laadInstellingen(): array {
+    $data = is_file(INSTELLINGEN_FILE) ? json_decode((string)file_get_contents(INSTELLINGEN_FILE), true) : null;
+    return is_array($data) ? array_intersect_key($data, array_flip(BEHEER_INSTELLINGEN)) : [];
+}
+
+function bewaarInstellingen(array $data): void {
+    if (!is_dir(INHOUD_DIR)) mkdir(INHOUD_DIR, 0775, true);
+    $tmp = INSTELLINGEN_FILE . '.tmp';
+    if (file_put_contents($tmp, json_encode(array_intersect_key($data, array_flip(BEHEER_INSTELLINGEN)), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)) === false || !rename($tmp, INSTELLINGEN_FILE)) {
+        http_response_code(500);
+        exit('Opslaan mislukt: de map inhoud/ is niet schrijfbaar.');
+    }
+}
+$CONFIG = laadInstellingen() + $CONFIG;
 
 function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 

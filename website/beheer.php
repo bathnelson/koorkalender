@@ -190,6 +190,24 @@ if ($actie !== '') {
         terug($hier . '?fotos=1', (string)$fout, true);
     }
 
+    if ($actie === 'instellingen_opslaan') {
+        $gevers = [];
+        foreach ((array)($_POST['gever'] ?? []) as $g) {
+            $naam = trim(mb_substr((string)($g['naam'] ?? ''), 0, 100));
+            if ($naam === '') continue;
+            $gevers[] = ['naam' => $naam, 'logo' => trim(mb_substr((string)($g['logo'] ?? ''), 0, 500)), 'link' => trim(mb_substr((string)($g['link'] ?? ''), 0, 500))];
+        }
+        $naam = trim(mb_substr((string)($_POST['naam'] ?? ''), 0, 100));
+        bewaarInstellingen([
+            'naam' => $naam !== '' ? $naam : (string)$CONFIG['naam'],
+            'ondertitel' => trim(mb_substr((string)($_POST['ondertitel'] ?? ''), 0, 150)),
+            'kop_afbeelding' => trim(mb_substr((string)($_POST['kop_afbeelding'] ?? ''), 0, 500)),
+            'subsidie_tekst' => trim(mb_substr((string)($_POST['subsidie_tekst'] ?? ''), 0, 150)),
+            'subsidiegevers' => $gevers,
+        ]);
+        terug($hier . '?instellingen=1', 'De instellingen zijn opgeslagen.');
+    }
+
     if ($actie === 'concert_opslaan' || $actie === 'concert_weg') {
         $info = laadConcertInfo();
         $bron = (string)($_POST['bron'] ?? '');
@@ -232,7 +250,8 @@ $csrf = '<input type="hidden" name="csrf" value="' . h(csrfToken()) . '">';
 kop($CONFIG, 'Beheer', '', false);
 echo '<div class="ledenkop"><h1>Beheer</h1><form method="post">' . $csrf . '<button name="actie" value="uitloggen" class="licht">Uitloggen</button></form></div>';
 $tabConcert = isset($_GET['concerten']) || isset($_GET['concert']);
-echo '<nav class="tabs"><a href="' . h($hier) . '"' . (!isset($_GET['fotos']) && !$tabConcert ? ' class="actief"' : '') . '>Pagina\'s</a><a href="' . h($hier . '?concerten=1') . '"' . ($tabConcert ? ' class="actief"' : '') . '>Concerten</a><a href="' . h($hier . '?fotos=1') . '"' . (isset($_GET['fotos']) ? ' class="actief"' : '') . '>Foto\'s</a><a href="' . h(url()) . '" target="_blank">Website bekijken ↗</a></nav>';
+$tabInst = isset($_GET['instellingen']);
+echo '<nav class="tabs"><a href="' . h($hier) . '"' . (!isset($_GET['fotos']) && !$tabConcert && !$tabInst ? ' class="actief"' : '') . '>Pagina\'s</a><a href="' . h($hier . '?concerten=1') . '"' . ($tabConcert ? ' class="actief"' : '') . '>Concerten</a><a href="' . h($hier . '?fotos=1') . '"' . (isset($_GET['fotos']) ? ' class="actief"' : '') . '>Foto\'s</a><a href="' . h($hier . '?instellingen=1') . '"' . ($tabInst ? ' class="actief"' : '') . '>Algemeen</a><a href="' . h(url()) . '" target="_blank">Website bekijken ↗</a></nav>';
 if ($bericht) echo '<p class="goed">' . h($bericht) . '</p>';
 if ($melding) echo '<p class="fout">' . h($melding) . '</p>';
 
@@ -286,6 +305,23 @@ if ($tabConcert && isset($_GET['concert'])) {
         }
         echo '</ul>';
     }
+} elseif ($tabInst) {
+    $gevers = array_values(array_filter((array)($CONFIG['subsidiegevers'] ?? []), 'is_array'));
+    $gevers[] = ['naam' => '', 'logo' => '', 'link' => ''];
+    echo '<form method="post" class="kaart bewerk">' . $csrf;
+    echo '<h2>Kop</h2><p class="stil">Wat je hier opslaat gaat voor de waarden in config.php.</p>';
+    echo '<label>Naam van het koor (bovenaan elke pagina)<input name="naam" value="' . h($CONFIG['naam'] ?? '') . '" maxlength="100" required></label>';
+    echo '<label>Ondertitel onder de naam<input name="ondertitel" value="' . h($CONFIG['ondertitel'] ?? '') . '" maxlength="150"></label>';
+    echo '<label>Kopfoto (breed bovenaan elke pagina, leeg = geen)<span class="fotoveld"><input name="kop_afbeelding" id="kopfoto" value="' . h($CONFIG['kop_afbeelding'] ?? '') . '" placeholder="fotos/naam.jpg"><button type="button" class="licht" data-fotokiezer="kopfoto">Kies foto</button></span></label>';
+    echo '<h2>Voettekst</h2>';
+    echo '<label>Tekst boven de logo\'s<input name="subsidie_tekst" value="' . h($CONFIG['subsidie_tekst'] ?? 'Mede mogelijk gemaakt door') . '" maxlength="150"></label>';
+    echo '<p class="stil">Subsidiegevers en sponsors. Zonder logo staat de naam er als tekst. Maak de naam leeg om er een weg te halen; onderaan is steeds een lege regel voor een nieuwe.</p>';
+    foreach ($gevers as $i => $g) {
+        echo '<fieldset class="gever"><div class="rij"><label style="flex:1">Naam<input name="gever[' . $i . '][naam]" value="' . h($g['naam'] ?? '') . '" placeholder="bijv. Gemeente Haarlem"></label>'
+            . '<label style="flex:1">Link<input type="url" name="gever[' . $i . '][link]" value="' . h($g['link'] ?? '') . '" placeholder="https://"></label></div>'
+            . '<label>Logo<span class="fotoveld"><input name="gever[' . $i . '][logo]" id="geverlogo' . $i . '" value="' . h($g['logo'] ?? '') . '" placeholder="fotos/logo.png"><button type="button" class="licht" data-fotokiezer="geverlogo' . $i . '">Kies logo</button></span></label></fieldset>';
+    }
+    echo '<div class="knoppen"><button name="actie" value="instellingen_opslaan">Opslaan</button></div></form>';
 } elseif (isset($_GET['fotos'])) {
     echo '<form method="post" enctype="multipart/form-data" class="kaart">' . $csrf . '<h2>Foto toevoegen</h2><input type="file" name="foto" id="foto" accept="image/jpeg,image/png,image/gif,image/webp" required> <button name="actie" value="foto" id="fotoknop">Uploaden</button><p class="stil">Grote foto\'s worden vóór het uploaden automatisch verkleind tot maximaal 1600 pixels breed. Na het uploaden zie je hieronder de regel die je in een pagina plakt. Zet je meerdere foto-regels direct onder elkaar, dan worden ze een fotogalerij.</p></form>';
     echo '<div class="fotobeheer">';
