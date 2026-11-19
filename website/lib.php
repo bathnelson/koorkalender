@@ -539,7 +539,7 @@ function ncVolledigPad(array $cfg, string $pad): string {
 }
 
 // Haalt een bestand (of een voorbeeldplaatje) op uit Nextcloud. Geeft de inhoud terug, of null.
-function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 40 * 1024 * 1024): ?string {
+function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 40 * 1024 * 1024, ?array &$status = null): ?string {
     $adres = $voorbeeld
         ? rtrim($cfg['nextcloud_url'], '/') . '/index.php/core/preview.png?' . http_build_query(['file' => ncVolledigPad($cfg, $pad), 'x' => 300, 'y' => 300, 'a' => 1, 'forceIcon' => 0])
         : ncAdres($cfg, $pad);
@@ -554,8 +554,40 @@ function ncOphalen(array $cfg, string $pad, bool $voorbeeld = false, int $max = 
     ]);
     $ok = curl_exec($c);
     $code = (int)curl_getinfo($c, CURLINFO_HTTP_CODE);
+    $status = ['http' => $code, 'fout' => curl_error($c), 'bytes' => strlen($data), 'te_groot' => strlen($data) > $max];
     curl_close($c);
     return $ok && $code === 200 && $data !== '' ? $data : null;
+}
+
+// Grote foto's (bijv. 12 megapixel van een telefoon) hebben veel geheugen nodig om te verkleinen.
+// Vraag zo nodig meer geheugen; lukt dat niet, dan geeft dit false (en slaan we het verkleinen over).
+function genoegGeheugen(int $breed, int $hoog): bool {
+    $nodig = (int)($breed * $hoog * 4 * 2.2) + memory_get_usage() + 16 * 1024 * 1024;
+    $naarBytes = function (string $w): int {
+        $w = trim($w);
+        if ($w === '' || $w === '-1') return PHP_INT_MAX;
+        $n = (int)$w; $e = strtolower(substr($w, -1));
+        return $e === 'g' ? $n << 30 : ($e === 'm' ? $n << 20 : ($e === 'k' ? $n << 10 : $n));
+    };
+    if ($naarBytes((string)ini_get('memory_limit')) >= $nodig) return true;
+    @ini_set('memory_limit', (string)max(256, (int)ceil($nodig / 1048576) + 32) . 'M');
+    return $naarBytes((string)ini_get('memory_limit')) >= $nodig;
+}
+
+// Maakt een klein vierkant plaatje (jpg) van een foto, voor de fotokiezer. Geeft null als het niet lukt.
+function maakMiniatuur(string $data, int $maat = 300): ?string {
+    if (!function_exists('imagecreatefromstring')) return null;
+    $info = @getimagesizefromstring($data);
+    if (!$info || !genoegGeheugen((int)$info[0], (int)$info[1])) return null;
+    $img = @imagecreatefromstring($data);
+    if (!$img) return null;
+    $b = imagesx($img); $h = imagesy($img); $z = min($b, $h);
+    $k = imagecreatetruecolor($maat, $maat);
+    imagecopyresampled($k, $img, 0, 0, (int)(($b - $z) / 2), (int)(($h - $z) / 2), $maat, $maat, $z, $z);
+    imagedestroy($img);
+    ob_start(); imagejpeg($k, null, 78); $uit = (string)ob_get_clean();
+    imagedestroy($k);
+    return $uit !== '' ? $uit : null;
 }
 
 // Maakt een foto kleiner (langste kant $max pixels) als de server dat kan (GD). Draait hem ook rechtop.
@@ -570,6 +602,7 @@ function verkleinFoto(string $bestand, int $max = 1600): void {
         $draai = [3 => 180, 6 => -90, 8 => 90][(int)($exif['Orientation'] ?? 1)] ?? 0;
     }
     if (max($info[0], $info[1]) <= $max && $draai === 0 && filesize($bestand) < 1500000) return;
+    if (!genoegGeheugen((int)$info[0], (int)$info[1])) return;
     $img = @imagecreatefromstring((string)file_get_contents($bestand));
     if (!$img) return;
     if ($draai) { $g = imagerotate($img, $draai, 0); if ($g) { imagedestroy($img); $img = $g; } }

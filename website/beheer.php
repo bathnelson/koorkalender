@@ -66,14 +66,46 @@ if (isset($_GET['ncfotos'])) {
 }
 if (isset($_GET['ncvoorbeeld'])) {
     $pad = ncAan($CONFIG) ? ncFotoPad($CONFIG, (string)$_GET['ncvoorbeeld']) : null;
+    $waarom = isset($_GET['waarom']);
     session_write_close();
-    $data = $pad !== null && preg_match(FOTO_EXT, $pad) ? (ncOphalen($CONFIG, $pad, true) ?? ncOphalen($CONFIG, $pad, false, 8 * 1024 * 1024)) : null;
-    $soort = $data !== null ? (new finfo(FILEINFO_MIME_TYPE))->buffer($data) : '';
-    if (!in_array($soort, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) { http_response_code(404); exit; }
-    header('Content-Type: ' . $soort);
-    header('X-Content-Type-Options: nosniff');
-    header('Cache-Control: private, max-age=86400');
-    echo $data;
+    $toon = function (string $data, string $soort) {
+        header('Content-Type: ' . $soort);
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: private, max-age=86400');
+        echo $data;
+        exit;
+    };
+    // Eerder gemaakte miniatuur?
+    $cacheMap = INHOUD_DIR . '/cache';
+    $cache = $pad !== null ? $cacheMap . '/nc-' . md5(ncAccount($CONFIG)[1] . '|' . $pad) . '.jpg' : null;
+    if (!$waarom && $cache && is_file($cache)) $toon((string)file_get_contents($cache), 'image/jpeg');
+    $verslag = [];
+    $soortVan = function (?string $d): string { return $d !== null ? (string)(new finfo(FILEINFO_MIME_TYPE))->buffer($d) : ''; };
+    $beeld = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if ($pad === null) $verslag[] = ncAan($CONFIG) ? 'Ongeldig pad.' : 'Niet ingelogd bij Nextcloud (geen account in deze sessie).';
+    elseif (!preg_match(FOTO_EXT, $pad)) $verslag[] = 'Geen foto-extensie: ' . $pad;
+    else {
+        // 1. het voorbeeldplaatje van Nextcloud zelf
+        $data = ncOphalen($CONFIG, $pad, true, 8 * 1024 * 1024, $st);
+        $soort = $soortVan($data);
+        $verslag[] = 'Voorbeeld van Nextcloud: HTTP ' . $st['http'] . ($st['fout'] ? ' (' . $st['fout'] . ')' : '') . ', ' . $st['bytes'] . ' bytes, ' . ($soort ?: 'geen data');
+        if (in_array($soort, $beeld, true)) {
+            if ($waarom) { header('Content-Type: text/plain; charset=utf-8'); exit("Gelukt.\n" . implode("\n", $verslag)); }
+            $toon($data, $soort);
+        }
+        // 2. anders de hele foto ophalen en hier verkleinen
+        $data = ncOphalen($CONFIG, $pad, false, 40 * 1024 * 1024, $st);
+        $verslag[] = 'Hele foto ophalen: HTTP ' . $st['http'] . ($st['fout'] ? ' (' . $st['fout'] . ')' : '') . ', ' . $st['bytes'] . ' bytes' . ($st['te_groot'] ? ' (te groot)' : '') . ', ' . ($soortVan($data) ?: 'geen data');
+        $klein = $data !== null ? maakMiniatuur($data) : null;
+        $verslag[] = 'Verkleinen op de server: ' . ($klein ? 'gelukt' : (function_exists('imagecreatefromstring') ? 'mislukt' : 'GD ontbreekt')) . ' (geheugen ' . ini_get('memory_limit') . ')';
+        if ($klein) {
+            if (!is_dir($cacheMap)) { @mkdir($cacheMap, 0775, true); @file_put_contents($cacheMap . '/.htaccess', "Require all denied\n"); }
+            @file_put_contents($cache, $klein);
+            if (!$waarom) $toon($klein, 'image/jpeg');
+        } elseif (!$waarom && in_array($soortVan($data), $beeld, true)) $toon($data, $soortVan($data));
+    }
+    if ($waarom) { header('Content-Type: text/plain; charset=utf-8'); exit("Pad: " . ($pad ?? '-') . "\n" . implode("\n", $verslag)); }
+    http_response_code(404);
     exit;
 }
 
@@ -170,8 +202,8 @@ if ($actie !== '') {
         $pad = ncAan($CONFIG) ? ncFotoPad($CONFIG, (string)($_POST['pad'] ?? '')) : null;
         if ($pad === null || !preg_match(FOTO_EXT, $pad)) antwoordJson(['fout' => 'Ongeldige foto.']);
         session_write_close();
-        $data = ncOphalen($CONFIG, $pad);
-        if ($data === null) antwoordJson(['fout' => 'De foto kon niet uit Nextcloud gehaald worden (of is groter dan 40 MB).']);
+        $data = ncOphalen($CONFIG, $pad, false, 40 * 1024 * 1024, $st);
+        if ($data === null) antwoordJson(['fout' => 'De foto kon niet uit Nextcloud gehaald worden (HTTP ' . $st['http'] . ($st['fout'] ? ', ' . $st['fout'] : '') . ($st['te_groot'] ? ', groter dan 40 MB' : '') . ').']);
         $tmp = tempnam(sys_get_temp_dir(), 'wkh');
         file_put_contents($tmp, $data);
         $info = @getimagesize($tmp);
