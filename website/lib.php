@@ -780,7 +780,8 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
     // Met een kopfoto staat de naam van het koor over de foto heen; anders links in de menubalk
     $logo = '<a class="logo" href="' . h(url()) . '">' . h($cfg['naam']) . '<span>' . h($cfg['ondertitel'] ?? '') . '</span></a>';
     if ($banner) echo '<div class="banner"><img src="' . h($banner) . '" alt="">' . $logo . '</div>';
-    echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '' : $logo);
+    // Met kopfoto staat de naam groot op de foto; op de telefoon verdwijnt de foto en staat de naam klein in de menubalk
+    echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '<a class="logo minilogo" href="' . h(url()) . '">' . h($cfg['naam']) . '</a>' : $logo);
     if ($menuTonen) {
         echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
         // Submenu's: pagina's met 'onder' komen in een uitklapmenu onder die pagina
