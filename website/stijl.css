@@ -40,15 +40,29 @@ img { max-width: 100%; height: auto; display: block; }
 .kop nav a { text-decoration: none; color: var(--tekst); padding: 8px 12px; border-radius: 8px; }
 .kop nav a:hover, .kop nav a.actief { background: var(--kleur-licht); color: var(--kleur); }
 .kop nav a.ledenknop { border: 1px solid var(--kleur); color: var(--kleur); }
+/* submenu's: uitklappen bij aanwijzen of met de tab-toets */
+.menugroep { position: relative; display: flex; }
+.kop nav .pijl { font-size: .75em; margin-left: 4px; opacity: .7; }
+.submenu { display: none; position: absolute; top: 100%; left: 0; z-index: 20; min-width: 230px; flex-direction: column; gap: 2px; padding: 6px; background: var(--kaart); border: 1px solid var(--lijn); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
+.menugroep:hover .submenu, .menugroep:focus-within .submenu { display: flex; }
 .menuknop { display: none; font-size: 1.6rem; cursor: pointer; padding: 4px 8px; }
 @media (max-width: 720px) {
   .menuknop { display: block; }
   .kop nav { display: none; width: 100%; flex-direction: column; padding-bottom: 12px; }
   #menuknop:checked ~ nav { display: flex; }
+  .menugroep { flex-direction: column; }
+  .submenu, .menugroep:hover .submenu { display: flex; position: static; min-width: 0; padding: 0 0 0 16px; border: 0; box-shadow: none; background: none; }
+  .kop nav .pijl { display: none; }
 }
 
 main.binnen { padding-top: 32px; padding-bottom: 48px; min-height: 60vh; }
-.voet { border-top: 1px solid var(--lijn); color: var(--stil); font-size: .9rem; padding: 20px 0; }
+.voet { border-top: 1px solid var(--lijn); color: var(--stil); font-size: .9rem; padding: 24px 0; margin-top: 32px; }
+.voet .binnen { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.voet p { margin: 0; }
+.gevers p { margin-bottom: 8px; }
+.gevers .logos { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.gevers a, .gevers .logos > span { display: inline-flex; align-items: center; color: var(--tekst); font-weight: 600; text-decoration: none; }
+.gevers img { height: 56px; width: auto; max-width: 220px; object-fit: contain; background: #fff; padding: 6px 10px; border-radius: 6px; }
 
 /* tekst van een pagina */
 .tekst h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 16px; }
@@ -56,10 +70,14 @@ main.binnen { padding-top: 32px; padding-bottom: 48px; min-height: 60vh; }
 .tekst p, .tekst ul, .tekst ol { max-width: 68ch; }
 .foto { margin: 24px 0; }
 .foto img { border-radius: 10px; max-height: 70vh; width: auto; }
-/* fotogalerij als masonry: kolommen waarin elke foto zijn eigen verhouding houdt */
-.galerij { column-width: 220px; column-gap: 8px; margin: 24px 0; }
-.galerij figure { break-inside: avoid; margin: 0 0 8px; }
-.galerij img { width: 100%; height: auto; border-radius: 6px; transition: opacity .2s; }
+/* fotogalerij als masonry met rijen van gelijke hoogte: elke foto krijgt de breedte die bij zijn verhouding (--r) hoort */
+.galerij { --rij: 220px; display: flex; flex-wrap: wrap; gap: 6px; margin: 24px 0; }
+.galerij::after { content: ''; flex-grow: 999999; }
+.galerij figure { position: relative; margin: 0; height: var(--rij); flex: var(--r, 1.5) 1 calc(var(--r, 1.5) * var(--rij)); max-width: 100%; overflow: hidden; border-radius: 6px; }
+.galerij figure a { display: block; height: 100%; }
+.galerij img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .2s, transform .3s; }
+.galerij figcaption { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; padding: 4px 8px; font-size: .8rem; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.6)); pointer-events: none; }
+@media (max-width: 600px) { .galerij { --rij: 130px; gap: 4px; } }
 .galerij a:hover img { opacity: .85; }
 figure { margin: 0; }
 figcaption { font-size: .85rem; color: var(--stil); padding-top: 4px; }
@@ -129,7 +147,7 @@ button.klein, .knop.klein { padding: 4px 10px; font-size: .85rem; font-weight: 4
 /* formulieren */
 .inlog { max-width: 420px; }
 label { display: block; font-weight: 600; margin: 12px 0; }
-input[type=password], input[type=text], input:not([type]), input[type=number], textarea {
+input[type=password], input[type=text], input:not([type]), input[type=number], input[type=url], input[type=date], input[type=email], select, textarea {
   display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; font-weight: 400;
   border: 1px solid var(--lijn); border-radius: 8px; background: var(--kaart); color: var(--tekst);
 }
@@ -202,3 +220,17 @@ textarea { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .95
 .fk-raster .fotonaam { position: absolute; left: 0; right: 0; bottom: 0; padding: 3px 4px; background: rgba(0,0,0,.55); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fk-raster button.bezig { opacity: .5; cursor: progress; }
 .fotokiezer [hidden] { display: none !important; }
+.gever { border: 1px solid var(--lijn); border-radius: 10px; padding: 8px 14px 12px; margin: 0 0 12px; }
+.gever .fotovoorbeeld { max-width: 160px; max-height: 80px; object-fit: contain; background: #fff; }
+/* versleepbaar menu in het beheer */
+.menukop { display: flex; align-items: baseline; gap: 12px; }
+.menukop h2 { margin-bottom: 0; }
+.goedtekst { color: #2e7d32; }
+.menulijst { min-height: 52px; }
+.menulijst .greep { cursor: grab; padding: 12px 0 12px 14px; color: var(--stil); font-size: 1.2rem; touch-action: none; user-select: none; }
+.menulijst li[data-diepte="1"] { padding-left: 36px; background: color-mix(in srgb, var(--kleur-licht) 45%, var(--kaart)); }
+.menulijst li[data-diepte="1"] .greep::before { content: '↳ '; font-size: .9rem; }
+.menulijst li.sleept { box-shadow: 0 6px 20px rgba(0,0,0,.18); position: relative; z-index: 2; background: var(--kaart); outline: 2px solid var(--kleur); }
+.menulijst li.meeverhuis { opacity: .6; }
+.bezig-slepen, .bezig-slepen * { cursor: grabbing !important; user-select: none; }
+#losselijst:empty::after { content: 'Alle pagina\'s staan in het menu.'; display: block; padding: 14px 16px; color: var(--stil); }

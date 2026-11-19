@@ -234,3 +234,107 @@
     });
   });
 })();
+
+// Menu-indeling met slepen: omhoog/omlaag voor de volgorde, naar rechts voor een submenu
+(function () {
+  var menu = document.getElementById('menulijst'), los = document.getElementById('losselijst');
+  var dataEl = document.getElementById('fotodata');
+  if (!menu || !los || !dataEl) return;
+  var data = JSON.parse(dataEl.textContent);
+  var status = document.getElementById('menustatus');
+  var STAP = 36; // pixels naar rechts voor een submenu
+
+  function rijen(lijst) { return Array.prototype.slice.call(lijst.children); }
+  function diepte(li) { return li.dataset.diepte === '1' ? 1 : 0; }
+  function zetDiepte(li, d) { li.dataset.diepte = String(d); }
+  // Regels: het eerste menu-item is een hoofditem, home is altijd een hoofditem, buiten het menu geen submenu's
+  function netjes() {
+    rijen(menu).forEach(function (li, i) { if (i === 0 || li.dataset.slug === 'home') zetDiepte(li, 0); });
+    rijen(los).forEach(function (li) { zetDiepte(li, 0); });
+  }
+  async function bewaar() {
+    netjes();
+    var lijst = rijen(menu).map(function (li) { return { s: li.dataset.slug, m: 1, d: diepte(li) }; })
+      .concat(rijen(los).map(function (li) { return { s: li.dataset.slug, m: 0, d: 0 }; }));
+    status.textContent = 'Bezig met opslaan…'; status.className = 'stil';
+    try {
+      var fd = new FormData();
+      fd.append('csrf', data.csrf); fd.append('actie', 'menu_opslaan'); fd.append('menu', JSON.stringify(lijst));
+      var r = await (await fetch(data.upload, { method: 'POST', body: fd, credentials: 'same-origin' })).json();
+      if (!r.bericht) throw new Error(r.fout || 'Opslaan lukte niet.');
+      status.textContent = 'Opgeslagen ✓'; status.className = 'goedtekst';
+    } catch (e) { status.textContent = 'Opslaan lukte niet. Ververs de pagina en probeer het opnieuw.'; status.className = 'fout'; }
+  }
+
+  var sleep = null; // { li, mee: [submenu-items die meeverhuizen], startX, startDiepte }
+  function begin(e) {
+    var greep = e.target.closest('.greep');
+    if (!greep || e.button > 0) return;
+    var li = greep.closest('li');
+    e.preventDefault();
+    var mee = [];
+    if (li.parentNode === menu && diepte(li) === 0) {
+      for (var n = li.nextElementSibling; n && diepte(n) === 1; n = n.nextElementSibling) mee.push(n);
+    }
+    mee.forEach(function (m) { m.classList.add('meeverhuis'); });
+    sleep = { li: li, mee: mee, startX: e.clientX, startDiepte: li.parentNode === menu ? diepte(li) : 0 };
+    li.classList.add('sleept');
+    document.body.classList.add('bezig-slepen');
+    greep.setPointerCapture && greep.setPointerCapture(e.pointerId);
+  }
+  function beweeg(e) {
+    if (!sleep) return;
+    var li = sleep.li;
+    // bij de rand van het venster meeschuiven, voor lange lijsten
+    if (e.clientY < 60) window.scrollBy(0, -12); else if (e.clientY > window.innerHeight - 60) window.scrollBy(0, 12);
+    // welke lijst en welke plek: de rij onder de muis
+    var doel = null, voor = true;
+    [menu, los].forEach(function (lijst) {
+      var vak = lijst.getBoundingClientRect();
+      if (e.clientY < vak.top - 30 || e.clientY > vak.bottom + 30) return;
+      var kandidaten = rijen(lijst).filter(function (r) { return r !== li && sleep.mee.indexOf(r) < 0; });
+      if (!kandidaten.length) { doel = { lijst: lijst, rij: null }; return; }
+      for (var i = 0; i < kandidaten.length; i++) {
+        var b = kandidaten[i].getBoundingClientRect();
+        if (e.clientY < b.top + b.height / 2) { doel = { lijst: lijst, rij: kandidaten[i] }; voor = true; return; }
+      }
+      doel = { lijst: lijst, rij: kandidaten[kandidaten.length - 1] }; voor = false;
+    });
+    if (doel) {
+      if (!doel.rij) doel.lijst.appendChild(li);
+      else if (voor) doel.lijst.insertBefore(li, doel.rij);
+      else {
+        // na een hoofditem met submenu: na zijn laatste submenu-item, behalve als we zelf een submenu-item worden
+        var na = doel.rij;
+        doel.lijst.insertBefore(li, na.nextSibling);
+      }
+    }
+    // diepte uit de horizontale beweging
+    if (li.parentNode === menu) {
+      var dx = e.clientX - sleep.startX;
+      var d = sleep.startDiepte + (dx > STAP / 2 ? 1 : dx < -STAP / 2 ? -1 : 0);
+      d = Math.max(0, Math.min(1, d));
+      if (!li.previousElementSibling || li.dataset.slug === 'home' || sleep.mee.length) d = 0; // een hoofditem met submenu blijft hoofditem
+      // tussen twee submenu-items in moet je zelf ook een submenu-item zijn
+      var volgende = li.nextElementSibling;
+      while (volgende && sleep.mee.indexOf(volgende) >= 0) volgende = volgende.nextElementSibling;
+      if (d === 0 && volgende && diepte(volgende) === 1 && !sleep.mee.length) d = 1;
+      zetDiepte(li, d);
+    } else zetDiepte(li, 0);
+    // submenu-items verhuizen mee, direct achter hun hoofditem
+    var plek = li;
+    sleep.mee.forEach(function (m) { if (li.parentNode === menu) { menu.insertBefore(m, plek.nextSibling); zetDiepte(m, 1); } else { los.insertBefore(m, plek.nextSibling); zetDiepte(m, 0); } plek = m; });
+  }
+  function einde() {
+    if (!sleep) return;
+    sleep.li.classList.remove('sleept');
+    sleep.mee.forEach(function (m) { m.classList.remove('meeverhuis'); });
+    document.body.classList.remove('bezig-slepen');
+    sleep = null;
+    bewaar();
+  }
+  document.addEventListener('pointerdown', begin);
+  document.addEventListener('pointermove', beweeg);
+  document.addEventListener('pointerup', einde);
+  document.addEventListener('pointercancel', einde);
+})();

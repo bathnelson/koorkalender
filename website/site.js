@@ -15,6 +15,12 @@
     });
   });
 
+  // Galerij: van foto's van elders de verhouding pas na het laden bepalen
+  document.querySelectorAll('.galerij figure:not([style]) img').forEach(function (img) {
+    var zet = function () { if (img.naturalWidth && img.naturalHeight) img.closest('figure').style.setProperty('--r', (img.naturalWidth / img.naturalHeight).toFixed(3)); };
+    if (img.complete) zet(); else img.addEventListener('load', zet);
+  });
+
   // Foto's: groot bekijken in een lichtbak, met pijltjes naar de vorige en volgende foto in dezelfde galerij
   var huidige = [], plek = 0, bak = null, img = null, onder = null;
   function toon() {

@@ -11,6 +11,24 @@ const PAGINAS_FILE = INHOUD_DIR . '/paginas.json';
 const FOTO_DIR = INHOUD_DIR . '/fotos';
 const BACKUP_DIR = INHOUD_DIR . '/backup';
 const MAX_BACKUPS = 50;
+const INSTELLINGEN_FILE = INHOUD_DIR . '/instellingen.json';
+// Deze instellingen kun je ook in het beheer aanpassen; wat daar is opgeslagen gaat voor config.php
+const BEHEER_INSTELLINGEN = ['naam', 'ondertitel', 'kop_afbeelding', 'subsidie_tekst', 'subsidiegevers'];
+
+function laadInstellingen(): array {
+    $data = is_file(INSTELLINGEN_FILE) ? json_decode((string)file_get_contents(INSTELLINGEN_FILE), true) : null;
+    return is_array($data) ? array_intersect_key($data, array_flip(BEHEER_INSTELLINGEN)) : [];
+}
+
+function bewaarInstellingen(array $data): void {
+    if (!is_dir(INHOUD_DIR)) mkdir(INHOUD_DIR, 0775, true);
+    $tmp = INSTELLINGEN_FILE . '.tmp';
+    if (file_put_contents($tmp, json_encode(array_intersect_key($data, array_flip(BEHEER_INSTELLINGEN)), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)) === false || !rename($tmp, INSTELLINGEN_FILE)) {
+        http_response_code(500);
+        exit('Opslaan mislukt: de map inhoud/ is niet schrijfbaar.');
+    }
+}
+$CONFIG = laadInstellingen() + $CONFIG;
 
 function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
@@ -234,7 +252,11 @@ function opmaak(string $tekst): string {
             $adres = veiligAdres($m[2]);
             if ($adres !== null) {
                 $onder = $m[1] !== '' ? '<figcaption>' . h($m[1]) . '</figcaption>' : '';
-                $galerij[] = '<figure><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '" loading="lazy"></a>' . $onder . '</figure>';
+                // Bij eigen foto's de verhouding meegeven, zodat de galerij meteen goed staat
+                $maat = preg_match('~^fotos/([A-Za-z0-9._-]+)$~', $m[2], $f) ? @getimagesize(FOTO_DIR . '/' . $f[1]) : false;
+                $r = $maat && $maat[1] > 0 ? round($maat[0] / $maat[1], 3) : null;
+                $galerij[] = '<figure' . ($r ? ' style="--r:' . $r . '"' : '') . '><a href="' . h($adres) . '"><img src="' . h($adres) . '" alt="' . h($m[1]) . '"'
+                    . ($maat ? ' width="' . (int)$maat[0] . '" height="' . (int)$maat[1] . '"' : '') . ' loading="lazy"></a>' . $onder . '</figure>';
             }
             continue;
         }
@@ -677,6 +699,13 @@ function grootte(int $b): string {
 
 // ---------- opbouw van een pagina ----------
 
+// Eén menu-item; met 'link' verwijst het naar een andere website
+function menuLink(string $slug, array $p, bool $actief, bool $pijl = false): string {
+    $extern = (string)($p['link'] ?? '') !== '' ? veiligAdres((string)$p['link']) : null;
+    return '<a href="' . h($extern ?? paginaUrl($slug)) . '"' . ($actief ? ' class="actief"' : '') . ($extern ? ' target="_blank" rel="noopener"' : '') . '>'
+        . h($p['titel']) . ($extern ? ' ↗' : '') . ($pijl ? '<span class="pijl" aria-hidden="true">▾</span>' : '') . '</a>';
+}
+
 function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = true): void {
     $paginas = laadPaginas();
     header('Content-Type: text/html; charset=utf-8');
@@ -693,9 +722,22 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
     echo '<header class="kop' . ($banner ? ' metbanner' : '') . '"><div class="binnen">' . ($banner ? '' : $logo);
     if ($menuTonen) {
         echo '<input type="checkbox" id="menuknop" hidden><label for="menuknop" class="menuknop" aria-label="Menu">☰</label><nav>';
+        // Submenu's: pagina's met 'onder' komen in een uitklapmenu onder die pagina
+        $kinderen = [];
+        foreach ($paginas as $slug => $p) {
+            $ouder = (string)($p['onder'] ?? '');
+            if (!empty($p['menu']) && $ouder !== '' && !empty($paginas[$ouder]['menu']) && empty($paginas[$ouder]['onder'])) $kinderen[$ouder][$slug] = $p;
+        }
         foreach ($paginas as $slug => $p) {
             if (empty($p['menu'])) continue;
-            echo '<a href="' . h(paginaUrl($slug)) . '"' . ($slug === $actief ? ' class="actief"' : '') . '>' . h($p['titel']) . '</a>';
+            $ouder = (string)($p['onder'] ?? '');
+            if ($ouder !== '' && isset($kinderen[$ouder][$slug])) continue;
+            $sub = $kinderen[$slug] ?? [];
+            $link = menuLink($slug, $p, $slug === $actief || isset($sub[$actief]), (bool)$sub);
+            if (!$sub) { echo $link; continue; }
+            echo '<div class="menugroep">' . $link . '<div class="submenu">';
+            foreach ($sub as $k => $q) echo menuLink($k, $q, $k === $actief);
+            echo '</div></div>';
         }
         echo '<a href="' . h(url('leden')) . '" class="ledenknop' . ($actief === 'leden' ? ' actief' : '') . '">Leden</a></nav>';
     }
@@ -703,6 +745,19 @@ function kop(array $cfg, string $titel, string $actief = '', bool $menuTonen = t
 }
 
 function voet(array $cfg): void {
-    echo '</main><footer class="voet"><div class="binnen">© ' . date('Y') . ' ' . h($cfg['naam']) . '</div></footer>';
+    // Subsidiegevers en sponsors met logo, in te stellen in config.php
+    $gevers = '';
+    foreach ((array)($cfg['subsidiegevers'] ?? []) as $g) {
+        if (!is_array($g) || trim((string)($g['naam'] ?? '')) === '') continue;
+        $logo = (string)($g['logo'] ?? '');
+        if (preg_match('~^fotos/([A-Za-z0-9._-]+)$~', $logo, $m) && !is_file(FOTO_DIR . '/' . $m[1])) $logo = ''; // logo nog niet geüpload
+        $logo = $logo !== '' ? veiligAdres($logo) : null;
+        $inhoud = $logo ? '<img src="' . h($logo) . '" alt="' . h($g['naam']) . '" loading="lazy">' : '<span>' . h($g['naam']) . '</span>';
+        $link = (string)($g['link'] ?? '') !== '' ? veiligAdres((string)$g['link']) : null;
+        $gevers .= $link ? '<a href="' . h($link) . '" target="_blank" rel="noopener" title="' . h($g['naam']) . '">' . $inhoud . '</a>' : '<span title="' . h($g['naam']) . '">' . $inhoud . '</span>';
+    }
+    echo '</main><footer class="voet"><div class="binnen">';
+    if ($gevers !== '') echo '<div class="gevers"><p>' . h((string)($cfg['subsidie_tekst'] ?? 'Mede mogelijk gemaakt door')) . '</p><div class="logos">' . $gevers . '</div></div>';
+    echo '<p class="rechten">© ' . date('Y') . ' ' . h($cfg['naam']) . '</p></div></footer>';
     echo '<script src="' . h(url('site.js')) . '?v=' . @filemtime(__DIR__ . '/site.js') . '" defer></script></body></html>';
 }
